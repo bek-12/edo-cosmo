@@ -19,6 +19,7 @@ export interface DecodedUser {
   email: string;
   name: string;
   role: "ADMIN" | "CASHIER";
+  profileImage?: string | null;
   iat: number;
   exp: number;
 }

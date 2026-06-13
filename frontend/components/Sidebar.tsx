@@ -222,9 +222,9 @@ export default function Sidebar() {
           className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold text-xs flex-shrink-0"
           aria-label="Profile"
         >
-          {user?.profileImage ? (
+        {user?.profileImage ? (
             <img
-              src={(user as DecodedUser & { profileImage?: string }).profileImage}
+              src={user.profileImage}
               alt="profile"
               className="w-full h-full rounded-full object-cover"
             />
