@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  password     String
+  role         Role     @default(CASHIER)
+  profileImage String?
+  createdAt    DateTime @default(now())
+  sales        Sale[]
+}
+
+model ShopSettings {
+  id        String   @id @default(cuid())
+  shopName  String   @default("GlowShop")
+  shopLogo  String?
+  email     String?
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  CASHIER
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  products Product[]
+}
+
+model Product {
+  id            String     @id @default(cuid())
+  name          String
+  categoryId    String
+  category      Category   @relation(fields: [categoryId], references: [id])
+  buyingPrice   Float
+  sellingPrice  Float
+  stock         Int        @default(0)
+  lowStockAlert Int        @default(5)
+  expiryDate    DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  saleItems     SaleItem[]
+}
+
+model Sale {
+  id          String     @id @default(cuid())
+  createdAt   DateTime   @default(now())
+  cashierId   String
+  cashier     User       @relation(fields: [cashierId], references: [id])
+  totalAmount Float
+  items       SaleItem[]
+}
+
+model SaleItem {
+  id          String  @id @default(cuid())
+  saleId      String
+  sale        Sale    @relation(fields: [saleId], references: [id])
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  quantity    Int
+  priceAtSale Float
+}

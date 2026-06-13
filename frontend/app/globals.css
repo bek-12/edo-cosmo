@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #f9fafb;
+}
+
+/* Remove tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Momentum scrolling */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: scroll;
+}
+
+/* Bottom sheet drag handle */
+.drag-handle {
+  width: 36px;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  margin: 0 auto 12px;
+}
+
+/* Smooth slide-up animation for bottom sheets */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Ensure all interactive elements have good touch targets */
+button, a, select, input[type="checkbox"], input[type="radio"] {
+  min-height: 44px;
+}
+
+/* Override for small icon buttons inside cards */
+.touch-sm {
+  min-height: 32px !important;
+}
