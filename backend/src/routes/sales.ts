@@ -12,7 +12,11 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       include: {
         cashier: { select: { id: true, name: true, email: true } },
         items: {
-          include: {
+          select: {
+            id: true,
+            productId: true,
+            quantity: true,
+            priceAtSale: true,
             product: { select: { id: true, name: true } },
           },
         },
