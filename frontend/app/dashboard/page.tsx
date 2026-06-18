@@ -23,8 +23,12 @@ interface ExpiringProduct {
 
 interface DashboardData {
   totalRevenue: number;
+  totalReturnsAmount: number;
+  totalReturnsCount: number;
   totalSalesToday: number;
   revenueToday: number;
+  returnsTodayAmount: number;
+  returnsTodayCount: number;
   lowStockProducts: {
     id: string;
     name: string;
@@ -46,12 +50,14 @@ function StatCard({
   icon: Icon,
   color,
   subtitle,
+  subtitleRed,
 }: {
   title: string;
   value: string;
   icon: React.ElementType;
   color: string;
   subtitle?: string;
+  subtitleRed?: string;
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-5 shadow-sm">
@@ -60,6 +66,7 @@ function StatCard({
           <p className="text-xs sm:text-sm text-gray-500 font-medium leading-tight">{title}</p>
           <p className="text-lg sm:text-2xl font-bold text-gray-800 mt-0.5 sm:mt-1 truncate">{value}</p>
           {subtitle && <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">{subtitle}</p>}
+          {subtitleRed && <p className="text-xs text-red-400 mt-0.5 hidden sm:block">{subtitleRed}</p>}
         </div>
         <div className={`p-2 sm:p-2.5 rounded-lg ${color} flex-shrink-0 ml-2`}>
           <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -109,11 +116,25 @@ export default function DashboardPage() {
           <>
             {/* Stat cards — 2 cols mobile, 5 cols desktop */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-6">
-              <StatCard title="Total Revenue"    value={fmt(data.totalRevenue)}           icon={DollarSign}    color="bg-rose-500"   subtitle="All time" />
-              <StatCard title="Today's Revenue"  value={fmt(data.revenueToday)}           icon={TrendingUp}    color="bg-pink-500"   subtitle="Today" />
-              <StatCard title="Sales Today"      value={String(data.totalSalesToday)}     icon={ShoppingBag}   color="bg-purple-500" subtitle="Transactions" />
-              <StatCard title="Low Stock"        value={String(data.lowStockProducts.length)} icon={AlertTriangle} color="bg-orange-500" subtitle="Need restock" />
-              <StatCard title="Expiring Soon"    value={String(data.expiringProducts.length)} icon={Clock}         color="bg-amber-500"  subtitle="Within 3 months" />
+              <StatCard
+                title="Net Revenue"
+                value={fmt(data.totalRevenue)}
+                icon={DollarSign}
+                color="bg-rose-500"
+                subtitle="All time (after returns)"
+                subtitleRed={data.totalReturnsAmount > 0 ? `− ${fmt(data.totalReturnsAmount)} in returns` : undefined}
+              />
+              <StatCard
+                title="Today's Revenue"
+                value={fmt(data.revenueToday)}
+                icon={TrendingUp}
+                color="bg-pink-500"
+                subtitle="Net today"
+                subtitleRed={data.returnsTodayAmount > 0 ? `− ${fmt(data.returnsTodayAmount)} returned` : undefined}
+              />
+              <StatCard title="Sales Today"   value={String(data.totalSalesToday)}          icon={ShoppingBag}   color="bg-purple-500" subtitle="Transactions" />
+              <StatCard title="Low Stock"      value={String(data.lowStockProducts.length)}  icon={AlertTriangle} color="bg-orange-500" subtitle="Need restock" />
+              <StatCard title="Expiring Soon"  value={String(data.expiringProducts.length)}  icon={Clock}         color="bg-amber-500"  subtitle="Within 3 months" />
             </div>
 
             {/* Chart + Top products — stack on mobile */}

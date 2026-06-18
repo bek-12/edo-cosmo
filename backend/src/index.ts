@@ -10,6 +10,7 @@ import categoryRoutes from "./routes/categories";
 import saleRoutes from "./routes/sales";
 import dashboardRoutes from "./routes/dashboard";
 import profileRoutes from "./routes/profile";
+import returnsRoutes from "./routes/returns";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -36,6 +37,9 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/sales", saleRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/returns", returnsRoutes);
+// eligibility is on the returns router but prefixed under /api/sales
+app.use("/api", returnsRoutes);
 
 // 404 handler
 app.use((_req, res) => {

@@ -13,50 +13,53 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
     const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
     const in90Days = new Date(startOfToday.getTime() + 90 * 24 * 60 * 60 * 1000);
 
-    // Total revenue (all time)
-    const totalRevenueResult = await prisma.sale.aggregate({
-      _sum: { totalAmount: true },
-    });
-    const totalRevenue = totalRevenueResult._sum.totalAmount ?? 0;
+    // ── Sales revenue ────────────────────────────────────────────────────
+    const totalSalesResult = await prisma.sale.aggregate({ _sum: { totalAmount: true } });
+    const totalSalesRevenue = totalSalesResult._sum.totalAmount ?? 0;
 
-    // Today's sales count
     const totalSalesToday = await prisma.sale.count({
       where: { createdAt: { gte: startOfToday, lt: endOfToday } },
     });
 
-    // Today's revenue
-    const revenueTodayResult = await prisma.sale.aggregate({
+    const salesTodayResult = await prisma.sale.aggregate({
       where: { createdAt: { gte: startOfToday, lt: endOfToday } },
       _sum: { totalAmount: true },
     });
-    const revenueToday = revenueTodayResult._sum.totalAmount ?? 0;
+    const salesTodayRevenue = salesTodayResult._sum.totalAmount ?? 0;
 
-    // Low stock products — fetch all, filter in JS (Prisma can't compare two columns)
-    const allProducts = await prisma.product.findMany({
-      include: { category: true },
+    // ── Returns ──────────────────────────────────────────────────────────
+    const totalReturnsResult = await prisma.return.aggregate({ _sum: { totalAmount: true } });
+    const totalReturnsAmount = totalReturnsResult._sum.totalAmount ?? 0;
+    const totalReturnsCount = await prisma.return.count();
+
+    const returnsTodayResult = await prisma.return.aggregate({
+      where: { createdAt: { gte: startOfToday, lt: endOfToday } },
+      _sum: { totalAmount: true },
     });
+    const returnsTodayAmount = returnsTodayResult._sum.totalAmount ?? 0;
+    const returnsTodayCount = await prisma.return.count({
+      where: { createdAt: { gte: startOfToday, lt: endOfToday } },
+    });
+
+    // ── Net revenue ──────────────────────────────────────────────────────
+    const totalRevenue = totalSalesRevenue - totalReturnsAmount;
+    const revenueToday = salesTodayRevenue - returnsTodayAmount;
+
+    // ── Low stock ────────────────────────────────────────────────────────
+    const allProducts = await prisma.product.findMany({ include: { category: true } });
     const lowStockProducts = allProducts.filter((p) => p.stock <= p.lowStockAlert);
 
-    // Expiring products — expiryDate is set AND within the next 90 days
+    // ── Expiring products ────────────────────────────────────────────────
     const expiringProducts = await prisma.product.findMany({
-      where: {
-        expiryDate: {
-          not: null,
-          gte: startOfToday,
-          lte: in90Days,
-        },
-      },
+      where: { expiryDate: { not: null, gte: startOfToday, lte: in90Days } },
       select: {
-        id: true,
-        name: true,
-        expiryDate: true,
-        stock: true,
+        id: true, name: true, expiryDate: true, stock: true,
         category: { select: { name: true } },
       },
       orderBy: { expiryDate: "asc" },
     });
 
-    // Top 5 products by quantity sold
+    // ── Top 5 products ───────────────────────────────────────────────────
     const topProductsRaw = await prisma.saleItem.groupBy({
       by: ["productId"],
       _sum: { quantity: true },
@@ -70,34 +73,41 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
           where: { id: item.productId },
           select: { id: true, name: true },
         });
-        return {
-          product,
-          totalQuantity: item._sum.quantity ?? 0,
-        };
+        return { product, totalQuantity: item._sum.quantity ?? 0 };
       })
     );
 
-    // Revenue for last 7 days
+    // ── Revenue last 7 days (net) ────────────────────────────────────────
     const revenueLastDays: { date: string; revenue: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-      const result = await prisma.sale.aggregate({
-        where: { createdAt: { gte: dayStart, lt: dayEnd } },
-        _sum: { totalAmount: true },
-      });
+      const [salesDay, returnsDay] = await Promise.all([
+        prisma.sale.aggregate({
+          where: { createdAt: { gte: dayStart, lt: dayEnd } },
+          _sum: { totalAmount: true },
+        }),
+        prisma.return.aggregate({
+          where: { createdAt: { gte: dayStart, lt: dayEnd } },
+          _sum: { totalAmount: true },
+        }),
+      ]);
 
       revenueLastDays.push({
         date: dayStart.toISOString().split("T")[0],
-        revenue: result._sum.totalAmount ?? 0,
+        revenue: (salesDay._sum.totalAmount ?? 0) - (returnsDay._sum.totalAmount ?? 0),
       });
     }
 
     res.json({
       totalRevenue,
+      totalReturnsAmount,
+      totalReturnsCount,
       totalSalesToday,
       revenueToday,
+      returnsTodayAmount,
+      returnsTodayCount,
       lowStockProducts,
       expiringProducts,
       topProducts,

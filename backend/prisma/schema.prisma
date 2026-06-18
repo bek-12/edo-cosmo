@@ -16,6 +16,7 @@ model User {
   profileImage String?
   createdAt    DateTime @default(now())
   sales        Sale[]
+  returns      Return[]
 }
 
 model ShopSettings {
@@ -38,18 +39,19 @@ model Category {
 }
 
 model Product {
-  id            String     @id @default(cuid())
+  id            String       @id @default(cuid())
   name          String
   categoryId    String
-  category      Category   @relation(fields: [categoryId], references: [id])
+  category      Category     @relation(fields: [categoryId], references: [id])
   buyingPrice   Float
   sellingPrice  Float
-  stock         Int        @default(0)
-  lowStockAlert Int        @default(5)
+  stock         Int          @default(0)
+  lowStockAlert Int          @default(5)
   expiryDate    DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   saleItems     SaleItem[]
+  returnItems   ReturnItem[]
 }
 
 model Sale {
@@ -59,12 +61,35 @@ model Sale {
   cashier     User       @relation(fields: [cashierId], references: [id])
   totalAmount Float
   items       SaleItem[]
+  returns     Return[]
 }
 
 model SaleItem {
   id          String  @id @default(cuid())
   saleId      String
   sale        Sale    @relation(fields: [saleId], references: [id])
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  quantity    Int
+  priceAtSale Float
+}
+
+model Return {
+  id          String       @id @default(cuid())
+  saleId      String
+  sale        Sale         @relation(fields: [saleId], references: [id])
+  cashierId   String
+  cashier     User         @relation(fields: [cashierId], references: [id])
+  reason      String?
+  totalAmount Float
+  createdAt   DateTime     @default(now())
+  items       ReturnItem[]
+}
+
+model ReturnItem {
+  id          String  @id @default(cuid())
+  returnId    String
+  return      Return  @relation(fields: [returnId], references: [id])
   productId   String
   product     Product @relation(fields: [productId], references: [id])
   quantity    Int
