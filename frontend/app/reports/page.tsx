@@ -16,6 +16,9 @@ interface SaleItem {
 interface ReturnItem {
   productId: string;
   quantity: number;
+  maxQty: number;
+  priceAtSale: number;
+  productName: string;
 }
 
 interface SaleReturn {
@@ -100,11 +103,17 @@ export default function ReportsPage() {
 
       // Init return items with 0 quantity
       setReturnItems(
-        sale.items.map((si) => ({
-          productId: si.productId,
-          quantity: 0,
-          maxQty: si.quantity - (alreadyReturned[si.productId] ?? 0),
-        } as ReturnItem & { maxQty: number }))
+        sale.items.map((si) => {
+          const previouslyReturned = alreadyReturned[si.productId] ?? 0;
+          const maxQty = si.quantity - previouslyReturned;
+          return {
+            productId: si.productId,
+            quantity: 0,
+            maxQty,
+            priceAtSale: si.priceAtSale,
+            productName: si.product.name,
+          };
+        })
       );
     } catch { setEligibility(null); }
   };
@@ -127,8 +136,7 @@ export default function ReportsPage() {
   const selectedItems = returnItems.filter((ri) => ri.quantity > 0);
 
   const refundAmount = selectedItems.reduce((sum, ri) => {
-    const saleItem = returnSale?.items.find((si) => si.productId === ri.productId);
-    return sum + (saleItem?.priceAtSale ?? 0) * ri.quantity;
+    return sum + ri.priceAtSale * ri.quantity;
   }, 0);
 
   const doReturn = async () => {
@@ -342,30 +350,31 @@ export default function ReportsPage() {
               {/* Items checklist */}
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700">Select items to return:</p>
-                {returnSale.items.map((si) => {
-                  const ri = returnItems.find((r) => r.productId === si.productId);
-                  const maxQty = (ri as ReturnItem & { maxQty?: number })?.maxQty ?? si.quantity;
-                  const qty = ri?.quantity ?? 0;
-                  return (
-                    <div key={si.id} className={`flex items-center justify-between p-3 rounded-lg border ${qty > 0 ? "border-rose-200 bg-rose-50" : "border-gray-100 bg-gray-50"}`}>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">{si.product.name}</p>
-                        <p className="text-xs text-gray-400">
-                          {fmt(si.priceAtSale)} each · sold {si.quantity} · max return {maxQty}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => updateReturnQty(si.productId, Math.max(0, qty - 1))}
-                          disabled={qty === 0}
-                          className="w-7 h-7 bg-gray-200 hover:bg-rose-100 rounded-full flex items-center justify-center disabled:opacity-40 text-lg leading-none">−</button>
-                        <span className="text-sm font-semibold w-6 text-center">{qty}</span>
-                        <button onClick={() => updateReturnQty(si.productId, Math.min(maxQty, qty + 1))}
-                          disabled={qty >= maxQty || maxQty === 0}
-                          className="w-7 h-7 bg-gray-200 hover:bg-rose-100 rounded-full flex items-center justify-center disabled:opacity-40 text-lg leading-none">+</button>
-                      </div>
+                {returnItems.map((ri) => (
+                  <div key={ri.productId} className={`flex items-center justify-between p-3 rounded-lg border ${ri.quantity > 0 ? "border-rose-200 bg-rose-50" : "border-gray-100 bg-gray-50"}`}>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{ri.productName}</p>
+                      <p className="text-xs text-gray-400">
+                        {fmt(ri.priceAtSale)} each · max return {ri.maxQty}
+                      </p>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateReturnQty(ri.productId, Math.max(0, ri.quantity - 1))}
+                        disabled={ri.quantity === 0}
+                        className="w-7 h-7 bg-gray-200 hover:bg-rose-100 rounded-full flex items-center justify-center disabled:opacity-40 text-lg leading-none font-bold"
+                      >−</button>
+                      <span className="text-sm font-semibold w-6 text-center">{ri.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateReturnQty(ri.productId, Math.min(ri.maxQty, ri.quantity + 1))}
+                        disabled={ri.quantity >= ri.maxQty || ri.maxQty === 0}
+                        className="w-7 h-7 bg-gray-200 hover:bg-rose-100 rounded-full flex items-center justify-center disabled:opacity-40 text-lg leading-none font-bold"
+                      >+</button>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Reason */}
