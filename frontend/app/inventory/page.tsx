@@ -189,11 +189,12 @@ function ModalFormContent({ form, setForm, categories, error, saving, editProduc
       </div>
 
       {/* Variants toggle */}
-      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+      <div className="flex items-center gap-3">
         <button type="button"
           onClick={() => setForm({ ...form, hasVariants: !form.hasVariants, variants: form.variants.length === 0 ? [{ variantValue: "", stock: "", buyingPrice: "", sellingPrice: "" }] : form.variants })}
-          className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${form.hasVariants ? "bg-rose-500" : "bg-gray-300"}`}>
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.hasVariants ? "translate-x-5" : "translate-x-0"}`} />
+          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${form.hasVariants ? "bg-rose-500" : "bg-gray-200"}`}
+          role="switch" aria-checked={form.hasVariants}>
+          <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${form.hasVariants ? "translate-x-4" : "translate-x-0"}`} />
         </button>
         <span className="text-sm font-medium text-gray-700">This product has variants (shades/sizes)</span>
       </div>
