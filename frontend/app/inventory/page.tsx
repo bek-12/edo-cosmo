@@ -286,6 +286,7 @@ export default function InventoryPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<"all" | "low" | "finished">("all");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [showModal, setShowModal] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
@@ -313,13 +314,19 @@ export default function InventoryPage() {
     });
   };
 
-  // Search includes variant values
+  // Search includes variant values + tab partition filter
   const filteredProducts = products.filter((p) => {
     const q = search.toLowerCase();
-    if (p.name.toLowerCase().includes(q)) return true;
-    if (p.hasVariants && p.variants.some((v) => v.variantValue.toLowerCase().includes(q))) return true;
-    return false;
+    const matchSearch = p.name.toLowerCase().includes(q) ||
+      (p.hasVariants && p.variants.some((v) => v.variantValue.toLowerCase().includes(q)));
+    if (!matchSearch) return false;
+    if (tab === "finished") return p.stock === 0;
+    if (tab === "low") return p.stock > 0 && p.stock <= p.lowStockAlert;
+    return true; // "all"
   });
+
+  const lowStockCount = products.filter((p) => p.stock > 0 && p.stock <= p.lowStockAlert).length;
+  const finishedCount = products.filter((p) => p.stock === 0).length;
 
   const openAdd = () => { setEditProduct(null); setForm(emptyForm); setError(""); setShowModal(true); };
   const openEdit = (p: Product) => {
@@ -440,6 +447,29 @@ export default function InventoryPage() {
           <input type="text" placeholder="Search products or variants..." value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+        </div>
+
+        {/* Tab partitions */}
+        <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit">
+          <button onClick={() => setTab("all")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === "all" ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
+            All Products
+            <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{products.length}</span>
+          </button>
+          <button onClick={() => setTab("low")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${tab === "low" ? "bg-white shadow text-orange-600" : "text-gray-500 hover:text-orange-500"}`}>
+            Low Stock
+            {lowStockCount > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${tab === "low" ? "bg-orange-100 text-orange-600" : "bg-orange-100 text-orange-500"}`}>{lowStockCount}</span>
+            )}
+          </button>
+          <button onClick={() => setTab("finished")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${tab === "finished" ? "bg-white shadow text-red-600" : "text-gray-500 hover:text-red-500"}`}>
+            Finished
+            {finishedCount > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${tab === "finished" ? "bg-red-100 text-red-600" : "bg-red-100 text-red-500"}`}>{finishedCount}</span>
+            )}
+          </button>
         </div>
 
         {loading ? (
