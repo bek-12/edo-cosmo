@@ -13,7 +13,7 @@ interface PnLPeriod {
 }
 
 async function calcPnL(startDate: Date): Promise<PnLPeriod> {
-  // totalEarned = sum of sale amounts - sum of return amounts in period
+  // totalEarned = sales revenue - returns in period
   const [salesResult, returnsResult] = await Promise.all([
     prisma.sale.aggregate({
       where: { createdAt: { gte: startDate } },
@@ -27,18 +27,25 @@ async function calcPnL(startDate: Date): Promise<PnLPeriod> {
   const totalEarned =
     (salesResult._sum.totalAmount ?? 0) - (returnsResult._sum.totalAmount ?? 0);
 
-  // totalSpent = quantity * (variant.buyingPrice ?? product.buyingPrice) for each saleItem in period
-  const saleItems = await prisma.saleItem.findMany({
-    where: { sale: { createdAt: { gte: startDate } } },
+  // totalSpent = cost of inventory purchased in this period
+  // For products without variants: buyingPrice * stock at creation time
+  // For products with variants: sum of (variant.buyingPrice ?? product.buyingPrice) * variant.stock
+  const productsCreated = await prisma.product.findMany({
+    where: { createdAt: { gte: startDate } },
     include: {
-      product: { select: { buyingPrice: true } },
-      variant: { select: { buyingPrice: true } },
+      variants: { select: { stock: true, buyingPrice: true } },
     },
   });
 
-  const totalSpent = saleItems.reduce((sum, item) => {
-    const bp = item.variant?.buyingPrice ?? item.product.buyingPrice;
-    return sum + item.quantity * bp;
+  const totalSpent = productsCreated.reduce((sum, p) => {
+    if (p.hasVariants && p.variants.length > 0) {
+      const variantCost = p.variants.reduce((vs, v) => {
+        const bp = v.buyingPrice ?? p.buyingPrice;
+        return vs + bp * v.stock;
+      }, 0);
+      return sum + variantCost;
+    }
+    return sum + p.buyingPrice * p.stock;
   }, 0);
 
   const netProfit = totalEarned - totalSpent;
