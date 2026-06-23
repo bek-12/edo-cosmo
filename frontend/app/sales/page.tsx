@@ -6,8 +6,19 @@ import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, AlertTriangle, 
 import axios from "axios";
 
 interface Category { id: string; name: string; }
-interface Product { id: string; name: string; category: Category; sellingPrice: number; stock: number; }
-interface CartItem { product: Product; quantity: number; }
+interface ProductVariant { id: string; variantType: string; variantValue: string; stock: number; sellingPrice: number | null; }
+interface Product {
+  id: string; name: string; category: Category;
+  sellingPrice: number; stock: number;
+  hasVariants: boolean; variants: ProductVariant[];
+}
+interface CartItem {
+  product: Product;
+  quantity: number;
+  variantId?: string;
+  variantLabel?: string;
+  priceAtSale: number;
+}
 
 export default function SalesPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -19,59 +30,91 @@ export default function SalesPage() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [success, setSuccess] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
-  const [cartOpen, setCartOpen] = useState(false); // mobile cart sheet
+  const [cartOpen, setCartOpen] = useState(false);
+  // Variant picker
+  const [variantProduct, setVariantProduct] = useState<Product | null>(null);
 
   const fetchData = async () => {
     try {
       const [pRes, cRes] = await Promise.all([api.get("/api/products"), api.get("/api/categories")]);
       setProducts(pRes.data); setCategories(cRes.data);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  // Lock body scroll when cart sheet open
   useEffect(() => {
-    document.body.style.overflow = cartOpen ? "hidden" : "";
+    document.body.style.overflow = (cartOpen || variantProduct !== null) ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [cartOpen]);
+  }, [cartOpen, variantProduct]);
 
   const filtered = products.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchCat = selectedCategory ? p.category.id === selectedCategory : true;
-    return matchSearch && matchCat && p.stock > 0;
+    const hasStock = p.hasVariants ? p.variants.some((v) => v.stock > 0) : p.stock > 0;
+    return matchSearch && matchCat && hasStock;
   });
 
-  const addToCart = (product: Product) => {
+  const cartKey = (productId: string, variantId?: string) => `${productId}:${variantId ?? ""}`;
+
+  const addToCart = (product: Product, variantId?: string, variantLabel?: string, price?: number) => {
+    const key = cartKey(product.id, variantId);
+    const maxStock = variantId
+      ? (product.variants.find((v) => v.id === variantId)?.stock ?? 0)
+      : product.stock;
+    const priceAtSale = price ?? product.sellingPrice;
+
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+      const existing = prev.find((item) => cartKey(item.product.id, item.variantId) === key);
       if (existing) {
-        if (existing.quantity >= product.stock) return prev;
-        return prev.map((item) => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+        if (existing.quantity >= maxStock) return prev;
+        return prev.map((item) =>
+          cartKey(item.product.id, item.variantId) === key
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: 1, variantId, variantLabel, priceAtSale }];
     });
   };
 
-  const updateQty = (productId: string, delta: number) => {
+  const handleProductClick = (product: Product) => {
+    if (product.hasVariants && product.variants.length > 0) {
+      setVariantProduct(product);
+    } else {
+      addToCart(product);
+    }
+  };
+
+  const updateQty = (productId: string, variantId: string | undefined, delta: number) => {
+    const key = cartKey(productId, variantId);
     setCart((prev) =>
-      prev.map((item) => item.product.id === productId ? { ...item, quantity: item.quantity + delta } : item)
-          .filter((item) => item.quantity > 0)
+      prev.map((item) =>
+        cartKey(item.product.id, item.variantId) === key
+          ? { ...item, quantity: item.quantity + delta }
+          : item
+      ).filter((item) => item.quantity > 0)
     );
   };
 
-  const removeFromCart = (productId: string) =>
-    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+  const removeFromCart = (productId: string, variantId?: string) => {
+    const key = cartKey(productId, variantId);
+    setCart((prev) => prev.filter((item) => cartKey(item.product.id, item.variantId) !== key));
+  };
 
-  const totalAmount = cart.reduce((sum, item) => sum + item.product.sellingPrice * item.quantity, 0);
+  const totalAmount = cart.reduce((sum, item) => sum + item.priceAtSale * item.quantity, 0);
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     setCheckingOut(true); setCheckoutError("");
     try {
       await api.post("/api/sales", {
-        items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity, priceAtSale: item.product.sellingPrice })),
+        items: cart.map((item) => ({
+          productId: item.product.id,
+          variantId: item.variantId ?? null,
+          quantity: item.quantity,
+          priceAtSale: item.priceAtSale,
+        })),
       });
       setCart([]); setSuccess(true); setCartOpen(false); fetchData();
       setTimeout(() => setSuccess(false), 4000);
@@ -104,32 +147,43 @@ export default function SalesPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {cart.map((item) => (
-              <div key={item.product.id} className="flex items-start gap-2 p-2.5 bg-gray-50 rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-700 leading-tight">{item.product.name}</p>
-                  <p className="text-xs text-gray-400">{fmt(item.product.sellingPrice)} each</p>
-                  <p className="text-xs font-bold text-rose-600 mt-0.5">{fmt(item.product.sellingPrice * item.quantity)}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <button onClick={() => removeFromCart(item.product.id)} className="text-gray-300 hover:text-red-400">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => updateQty(item.product.id, -1)}
-                      className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center">
-                      <Minus className="w-3 h-3" />
+            {cart.map((item) => {
+              const key = cartKey(item.product.id, item.variantId);
+              const maxStock = item.variantId
+                ? (item.product.variants.find((v) => v.id === item.variantId)?.stock ?? 0)
+                : item.product.stock;
+              return (
+                <div key={key} className="flex items-start gap-2 p-2.5 bg-gray-50 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-700 leading-tight">
+                      {item.product.name}
+                      {item.variantLabel && (
+                        <span className="text-gray-400 font-normal"> · {item.variantLabel}</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-400">{fmt(item.priceAtSale)} each</p>
+                    <p className="text-xs font-bold text-rose-600 mt-0.5">{fmt(item.priceAtSale * item.quantity)}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <button onClick={() => removeFromCart(item.product.id, item.variantId)} className="text-gray-300 hover:text-red-400">
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                    <span className="text-xs font-semibold w-5 text-center">{item.quantity}</span>
-                    <button onClick={() => updateQty(item.product.id, 1)}
-                      disabled={item.quantity >= item.product.stock}
-                      className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center disabled:opacity-40">
-                      <Plus className="w-3 h-3" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => updateQty(item.product.id, item.variantId, -1)}
+                        className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center">
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-xs font-semibold w-5 text-center">{item.quantity}</span>
+                      <button onClick={() => updateQty(item.product.id, item.variantId, 1)}
+                        disabled={item.quantity >= maxStock}
+                        className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center disabled:opacity-40">
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -146,11 +200,35 @@ export default function SalesPage() {
     </>
   );
 
+  const ProductGrid = ({ cols }: { cols: string }) => (
+    <div className={`grid ${cols} gap-2 sm:gap-3`}>
+      {filtered.map((p) => {
+        const inCart = cart.some((c) => c.product.id === p.id);
+        return (
+          <button key={p.id} onClick={() => handleProductClick(p)}
+            className={`text-left p-2.5 sm:p-3 rounded-xl border transition-all shadow-sm ${inCart ? "border-rose-400 bg-rose-50" : "border-gray-100 bg-white hover:border-rose-200 hover:bg-rose-50"}`}>
+            <div className="w-full h-8 sm:h-10 bg-gradient-to-br from-rose-100 to-pink-100 rounded-lg mb-1.5 sm:mb-2 flex items-center justify-center">
+              <span className="text-rose-400">✨</span>
+            </div>
+            <p className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2">{p.name}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{p.category.name}</p>
+            <p className="text-sm font-bold text-rose-600 mt-1">{fmt(p.sellingPrice)}</p>
+            {p.hasVariants ? (
+              <p className="text-xs text-blue-500">{p.variants.length} variants</p>
+            ) : (
+              <p className="text-xs text-gray-400">×{p.stock}</p>
+            )}
+          </button>
+        );
+      })}
+      {filtered.length === 0 && <div className="col-span-full text-center text-gray-400 py-8 text-sm">No products found</div>}
+    </div>
+  );
+
   return (
     <Layout>
-      {/* Desktop layout: side by side */}
-      <div className="hidden lg:flex h-[calc(100vh-0px)] overflow-hidden">
-        {/* Products */}
+      {/* Desktop layout */}
+      <div className="hidden lg:flex h-screen overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden p-4">
           <div className="mb-4">
             <h1 className="text-xl font-bold text-gray-800">Point of Sale</h1>
@@ -159,8 +237,7 @@ export default function SalesPage() {
           <div className="flex gap-2 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Search products..." value={search}
-                onChange={(e) => setSearch(e.target.value)}
+              <input type="text" placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
             </div>
             <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
@@ -169,36 +246,13 @@ export default function SalesPage() {
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          {loading ? (
-            <div className="flex items-center justify-center flex-1 text-gray-400">Loading...</div>
-          ) : (
-            <div className="overflow-y-auto flex-1">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {filtered.map((p) => {
-                  const inCart = cart.find((c) => c.product.id === p.id);
-                  return (
-                    <button key={p.id} onClick={() => addToCart(p)}
-                      className={`text-left p-3 rounded-xl border transition-all shadow-sm ${inCart ? "border-rose-400 bg-rose-50" : "border-gray-100 bg-white hover:border-rose-200 hover:bg-rose-50"}`}>
-                      <div className="w-full h-10 bg-gradient-to-br from-rose-100 to-pink-100 rounded-lg mb-2 flex items-center justify-center">
-                        <span className="text-rose-400 text-lg">✨</span>
-                      </div>
-                      <p className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2">{p.name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{p.category.name}</p>
-                      <p className="text-sm font-bold text-rose-600 mt-1">{fmt(p.sellingPrice)}</p>
-                      <p className="text-xs text-gray-400">Stock: {p.stock}</p>
-                    </button>
-                  );
-                })}
-                {filtered.length === 0 && <div className="col-span-full text-center text-gray-400 py-12">No products found</div>}
-              </div>
-            </div>
+          {loading ? <div className="flex items-center justify-center flex-1 text-gray-400">Loading...</div> : (
+            <div className="overflow-y-auto flex-1"><ProductGrid cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-4" /></div>
           )}
         </div>
-        {/* Cart */}
         <div className="w-80 bg-white border-l border-gray-100 flex flex-col shadow-sm">
           <div className="px-4 py-4 border-b border-gray-100 flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5 text-rose-500" />
-            <h2 className="font-semibold text-gray-800">Cart</h2>
+            <ShoppingCart className="w-5 h-5 text-rose-500" /><h2 className="font-semibold text-gray-800">Cart</h2>
             {cart.length > 0 && (
               <span className="ml-auto text-xs bg-rose-100 text-rose-600 font-semibold px-2 py-0.5 rounded-full">
                 {cart.length} item{cart.length !== 1 ? "s" : ""}
@@ -209,16 +263,14 @@ export default function SalesPage() {
         </div>
       </div>
 
-      {/* ── MOBILE layout: single column ── */}
+      {/* Mobile layout */}
       <div className="lg:hidden flex flex-col pb-28">
         <div className="p-4">
-          <h1 className="text-xl font-bold text-gray-800 mb-1">Point of Sale</h1>
-          {/* Search + filter full width */}
+          <h1 className="text-xl font-bold text-gray-800 mb-3">Point of Sale</h1>
           <div className="flex flex-col gap-2 mb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Search products..." value={search}
-                onChange={(e) => setSearch(e.target.value)}
+              <input type="text" placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
             </div>
             <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
@@ -227,48 +279,22 @@ export default function SalesPage() {
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          {/* Success toast */}
           {success && (
             <div className="mb-3 px-3 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-600 text-sm">
               <CheckCircle className="w-4 h-4" />Sale completed!
             </div>
           )}
-          {/* Products grid 2 cols on mobile */}
-          {loading ? (
-            <div className="flex items-center justify-center h-40 text-gray-400">Loading...</div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {filtered.map((p) => {
-                const inCart = cart.find((c) => c.product.id === p.id);
-                return (
-                  <button key={p.id} onClick={() => addToCart(p)}
-                    className={`text-left p-2.5 rounded-xl border transition-all shadow-sm ${inCart ? "border-rose-400 bg-rose-50" : "border-gray-100 bg-white"}`}>
-                    <div className="w-full h-8 bg-gradient-to-br from-rose-100 to-pink-100 rounded-lg mb-1.5 flex items-center justify-center">
-                      <span className="text-rose-400">✨</span>
-                    </div>
-                    <p className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2">{p.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{p.category.name}</p>
-                    <p className="text-sm font-bold text-rose-600 mt-1">{fmt(p.sellingPrice)}</p>
-                    <p className="text-xs text-gray-400">×{p.stock}</p>
-                  </button>
-                );
-              })}
-              {filtered.length === 0 && <div className="col-span-full text-center text-gray-400 py-8">No products found</div>}
-            </div>
+          {loading ? <div className="flex items-center justify-center h-40 text-gray-400">Loading...</div> : (
+            <ProductGrid cols="grid-cols-2" />
           )}
         </div>
-
-        {/* Sticky cart bar at bottom */}
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-100 shadow-lg px-4 py-3">
           <button onClick={() => setCartOpen(true)}
             className="w-full bg-rose-500 hover:bg-rose-600 text-white font-semibold py-3 rounded-xl text-sm flex items-center justify-between px-4 min-h-[44px]">
             <div className="flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4" />
-              <span>Cart</span>
+              <ShoppingCart className="w-4 h-4" /><span>Cart</span>
               {cart.length > 0 && (
-                <span className="bg-white text-rose-500 font-bold text-xs px-1.5 py-0.5 rounded-full">
-                  {cart.length}
-                </span>
+                <span className="bg-white text-rose-500 font-bold text-xs px-1.5 py-0.5 rounded-full">{cart.length}</span>
               )}
             </div>
             <span className="font-bold">{fmt(totalAmount)}</span>
@@ -276,7 +302,7 @@ export default function SalesPage() {
         </div>
       </div>
 
-      {/* ── Mobile cart bottom sheet ── */}
+      {/* Mobile cart sheet */}
       {cartOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setCartOpen(false)} />
@@ -292,11 +318,57 @@ export default function SalesPage() {
                   </span>
                 )}
               </div>
-              <button onClick={() => setCartOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => setCartOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             <CartItems />
+          </div>
+        </div>
+      )}
+
+      {/* Variant picker sheet */}
+      {variantProduct && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setVariantProduct(null)} />
+          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-sm animate-slide-up sm:animate-none">
+            <div className="drag-handle mt-3 sm:hidden" />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-800">
+                {variantProduct.name} — Select Variant
+              </h2>
+              <button onClick={() => setVariantProduct(null)} className="text-gray-400"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="px-4 py-3 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+              {variantProduct.variants.map((v) => {
+                const price = v.sellingPrice ?? variantProduct.sellingPrice;
+                const outOfStock = v.stock === 0;
+                return (
+                  <button key={v.id}
+                    disabled={outOfStock}
+                    onClick={() => {
+                      addToCart(variantProduct, v.id, `${v.variantType} ${v.variantValue}`, price);
+                      setVariantProduct(null);
+                    }}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all ${
+                      outOfStock
+                        ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
+                        : "border-rose-100 bg-white hover:border-rose-400 hover:bg-rose-50"
+                    }`}>
+                    <span className="text-base font-bold text-gray-800">{v.variantValue}</span>
+                    <span className="text-xs text-gray-400 capitalize mt-0.5">{v.variantType}</span>
+                    <span className="text-sm font-bold text-rose-600 mt-1">{fmt(price)}</span>
+                    <span className={`text-xs mt-0.5 ${outOfStock ? "text-red-400" : "text-gray-400"}`}>
+                      {outOfStock ? "Out of stock" : `×${v.stock}`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="p-4 pt-2">
+              <button onClick={() => setVariantProduct(null)}
+                className="w-full py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

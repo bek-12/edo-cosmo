@@ -5,6 +5,46 @@ import { authenticate, AuthRequest } from "../middleware/auth";
 const router = Router();
 const prisma = new PrismaClient();
 
+interface PnLPeriod {
+  totalSpent: number;
+  totalEarned: number;
+  netProfit: number;
+  isLoss: boolean;
+}
+
+async function calcPnL(startDate: Date): Promise<PnLPeriod> {
+  // totalEarned = sum of sale amounts - sum of return amounts in period
+  const [salesResult, returnsResult] = await Promise.all([
+    prisma.sale.aggregate({
+      where: { createdAt: { gte: startDate } },
+      _sum: { totalAmount: true },
+    }),
+    prisma.return.aggregate({
+      where: { createdAt: { gte: startDate } },
+      _sum: { totalAmount: true },
+    }),
+  ]);
+  const totalEarned =
+    (salesResult._sum.totalAmount ?? 0) - (returnsResult._sum.totalAmount ?? 0);
+
+  // totalSpent = quantity * (variant.buyingPrice ?? product.buyingPrice) for each saleItem in period
+  const saleItems = await prisma.saleItem.findMany({
+    where: { sale: { createdAt: { gte: startDate } } },
+    include: {
+      product: { select: { buyingPrice: true } },
+      variant: { select: { buyingPrice: true } },
+    },
+  });
+
+  const totalSpent = saleItems.reduce((sum, item) => {
+    const bp = item.variant?.buyingPrice ?? item.product.buyingPrice;
+    return sum + item.quantity * bp;
+  }, 0);
+
+  const netProfit = totalEarned - totalSpent;
+  return { totalSpent, totalEarned, netProfit, isLoss: netProfit < 0 };
+}
+
 // GET /api/dashboard
 router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -12,6 +52,11 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
     const in90Days = new Date(startOfToday.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+    // P&L period start dates
+    const weekStart = new Date(startOfToday.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthStart = new Date(startOfToday.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const yearStart = new Date(startOfToday.getTime() - 365 * 24 * 60 * 60 * 1000);
 
     // ── Sales revenue ────────────────────────────────────────────────────
     const totalSalesResult = await prisma.sale.aggregate({ _sum: { totalAmount: true } });
@@ -46,8 +91,12 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
     const revenueToday = salesTodayRevenue - returnsTodayAmount;
 
     // ── Low stock ────────────────────────────────────────────────────────
-    const allProducts = await prisma.product.findMany({ include: { category: true } });
-    const lowStockProducts = allProducts.filter((p) => p.stock <= p.lowStockAlert);
+    const allProducts = await prisma.product.findMany({ include: { category: true, variants: true } });
+    const productsWithStock = allProducts.map((p) => {
+      const stock = p.hasVariants ? p.variants.reduce((s, v) => s + v.stock, 0) : p.stock;
+      return { ...p, stock };
+    });
+    const lowStockProducts = productsWithStock.filter((p) => p.stock <= p.lowStockAlert);
 
     // ── Expiring products ────────────────────────────────────────────────
     const expiringProducts = await prisma.product.findMany({
@@ -100,6 +149,13 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       });
     }
 
+    // ── P&L ─────────────────────────────────────────────────────────────
+    const [weekly, monthly, yearly] = await Promise.all([
+      calcPnL(weekStart),
+      calcPnL(monthStart),
+      calcPnL(yearStart),
+    ]);
+
     res.json({
       totalRevenue,
       totalReturnsAmount,
@@ -112,6 +168,7 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       expiringProducts,
       topProducts,
       revenueLastDays,
+      pnl: { weekly, monthly, yearly },
     });
   } catch (error) {
     console.error("Dashboard error:", error);

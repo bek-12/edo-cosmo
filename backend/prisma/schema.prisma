@@ -39,19 +39,37 @@ model Category {
 }
 
 model Product {
-  id            String       @id @default(cuid())
+  id            String           @id @default(cuid())
   name          String
   categoryId    String
-  category      Category     @relation(fields: [categoryId], references: [id])
+  category      Category         @relation(fields: [categoryId], references: [id])
   buyingPrice   Float
   sellingPrice  Float
-  stock         Int          @default(0)
-  lowStockAlert Int          @default(5)
+  stock         Int              @default(0)
+  lowStockAlert Int              @default(5)
   expiryDate    DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  hasVariants   Boolean          @default(false)
+  unit          String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
   saleItems     SaleItem[]
   returnItems   ReturnItem[]
+  variants      ProductVariant[]
+}
+
+model ProductVariant {
+  id           String       @id @default(cuid())
+  productId    String
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantType  String
+  variantValue String
+  stock        Int          @default(0)
+  buyingPrice  Float?
+  sellingPrice Float?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  saleItems    SaleItem[]
+  returnItems  ReturnItem[]
 }
 
 model Sale {
@@ -65,11 +83,13 @@ model Sale {
 }
 
 model SaleItem {
-  id          String  @id @default(cuid())
+  id          String          @id @default(cuid())
   saleId      String
-  sale        Sale    @relation(fields: [saleId], references: [id])
+  sale        Sale            @relation(fields: [saleId], references: [id])
   productId   String
-  product     Product @relation(fields: [productId], references: [id])
+  product     Product         @relation(fields: [productId], references: [id])
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id])
   quantity    Int
   priceAtSale Float
 }
@@ -87,11 +107,13 @@ model Return {
 }
 
 model ReturnItem {
-  id          String  @id @default(cuid())
+  id          String          @id @default(cuid())
   returnId    String
-  return      Return  @relation(fields: [returnId], references: [id])
+  return      Return          @relation(fields: [returnId], references: [id])
   productId   String
-  product     Product @relation(fields: [productId], references: [id])
+  product     Product         @relation(fields: [productId], references: [id])
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id])
   quantity    Int
   priceAtSale Float
 }

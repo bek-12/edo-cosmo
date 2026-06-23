@@ -3,22 +3,16 @@ import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, ShoppingBag, AlertTriangle, DollarSign, Clock } from "lucide-react";
 
 interface ExpiringProduct {
-  id: string;
-  name: string;
-  expiryDate: string;
-  stock: number;
-  category: { name: string };
+  id: string; name: string; expiryDate: string; stock: number; category: { name: string };
+}
+
+interface PnLData {
+  totalSpent: number; totalEarned: number; netProfit: number; isLoss: boolean;
 }
 
 interface DashboardData {
@@ -29,35 +23,15 @@ interface DashboardData {
   revenueToday: number;
   returnsTodayAmount: number;
   returnsTodayCount: number;
-  lowStockProducts: {
-    id: string;
-    name: string;
-    stock: number;
-    lowStockAlert: number;
-    category: { name: string };
-  }[];
+  lowStockProducts: { id: string; name: string; stock: number; lowStockAlert: number; category: { name: string } }[];
   expiringProducts: ExpiringProduct[];
-  topProducts: {
-    product: { id: string; name: string } | null;
-    totalQuantity: number;
-  }[];
+  topProducts: { product: { id: string; name: string } | null; totalQuantity: number }[];
   revenueLastDays: { date: string; revenue: number }[];
+  pnl: { weekly: PnLData; monthly: PnLData; yearly: PnLData };
 }
 
-function StatCard({
-  title,
-  value,
-  icon: Icon,
-  color,
-  subtitle,
-  subtitleRed,
-}: {
-  title: string;
-  value: string;
-  icon: React.ElementType;
-  color: string;
-  subtitle?: string;
-  subtitleRed?: string;
+function StatCard({ title, value, icon: Icon, color, subtitle, subtitleRed }: {
+  title: string; value: string; icon: React.ElementType; color: string; subtitle?: string; subtitleRed?: string;
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-5 shadow-sm">
@@ -79,19 +53,15 @@ function StatCard({
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pnlPeriod, setPnlPeriod] = useState<"weekly" | "monthly" | "yearly">("weekly");
 
   useEffect(() => {
-    api
-      .get("/api/dashboard")
-      .then((res) => setData(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    api.get("/api/dashboard").then((res) => setData(res.data)).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-ET", { style: "currency", currency: "ETB", maximumFractionDigits: 0 })
-      .format(n)
-      .replace("ETB", "Birr");
+      .format(n).replace("ETB", "Birr");
 
   const fmtDate = (d: string) =>
     new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -101,6 +71,9 @@ export default function DashboardPage() {
 
   const daysUntilExpiry = (d: string) =>
     Math.ceil((new Date(d).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+
+  const pnlData = data?.pnl[pnlPeriod];
+  const periodLabels = { weekly: "This Week", monthly: "This Month", yearly: "This Year" };
 
   return (
     <Layout>
@@ -114,30 +87,51 @@ export default function DashboardPage() {
           <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>
         ) : data ? (
           <>
-            {/* Stat cards — 2 cols mobile, 5 cols desktop */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-6">
-              <StatCard
-                title="Net Revenue"
-                value={fmt(data.totalRevenue)}
-                icon={DollarSign}
-                color="bg-rose-500"
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-5">
+              <StatCard title="Net Revenue" value={fmt(data.totalRevenue)} icon={DollarSign} color="bg-rose-500"
                 subtitle="All time (after returns)"
-                subtitleRed={data.totalReturnsAmount > 0 ? `− ${fmt(data.totalReturnsAmount)} in returns` : undefined}
-              />
-              <StatCard
-                title="Today's Revenue"
-                value={fmt(data.revenueToday)}
-                icon={TrendingUp}
-                color="bg-pink-500"
+                subtitleRed={data.totalReturnsAmount > 0 ? `− ${fmt(data.totalReturnsAmount)} returned` : undefined} />
+              <StatCard title="Today's Revenue" value={fmt(data.revenueToday)} icon={TrendingUp} color="bg-pink-500"
                 subtitle="Net today"
-                subtitleRed={data.returnsTodayAmount > 0 ? `− ${fmt(data.returnsTodayAmount)} returned` : undefined}
-              />
-              <StatCard title="Sales Today"   value={String(data.totalSalesToday)}          icon={ShoppingBag}   color="bg-purple-500" subtitle="Transactions" />
-              <StatCard title="Low Stock"      value={String(data.lowStockProducts.length)}  icon={AlertTriangle} color="bg-orange-500" subtitle="Need restock" />
-              <StatCard title="Expiring Soon"  value={String(data.expiringProducts.length)}  icon={Clock}         color="bg-amber-500"  subtitle="Within 3 months" />
+                subtitleRed={data.returnsTodayAmount > 0 ? `− ${fmt(data.returnsTodayAmount)} returned` : undefined} />
+              <StatCard title="Sales Today"  value={String(data.totalSalesToday)}         icon={ShoppingBag}   color="bg-purple-500" subtitle="Transactions" />
+              <StatCard title="Low Stock"    value={String(data.lowStockProducts.length)} icon={AlertTriangle} color="bg-orange-500" subtitle="Need restock" />
+              <StatCard title="Expiring"     value={String(data.expiringProducts.length)} icon={Clock}         color="bg-amber-500"  subtitle="Within 3 months" />
             </div>
 
-            {/* Chart + Top products — stack on mobile */}
+            {/* P&L Card */}
+            {pnlData && (
+              <div className={`rounded-2xl p-5 sm:p-6 mb-4 sm:mb-5 ${pnlData.isLoss ? "bg-gradient-to-br from-rose-600 to-red-700" : "bg-gradient-to-br from-emerald-500 to-green-600"}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-white/80 text-sm font-semibold uppercase tracking-wide">P&amp;L — {periodLabels[pnlPeriod]}</span>
+                  <div className="flex gap-1">
+                    {(["weekly", "monthly", "yearly"] as const).map((p) => (
+                      <button key={p} onClick={() => setPnlPeriod(p)}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${pnlPeriod === p ? "bg-white text-gray-800" : "bg-white/20 text-white hover:bg-white/30"}`}>
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="text-center my-3 sm:my-4">
+                  <p className="text-3xl sm:text-5xl font-bold text-white">
+                    {pnlData.isLoss ? "−" : "+"}{fmt(Math.abs(pnlData.netProfit))}
+                  </p>
+                  <p className={`text-sm font-semibold mt-1 ${pnlData.isLoss ? "text-red-200" : "text-green-100"}`}>
+                    {pnlData.isLoss ? "▼ Net Loss" : "▲ Net Profit"}
+                  </p>
+                </div>
+
+                <div className="flex justify-between text-white/80 text-xs sm:text-sm mt-4">
+                  <span>Earned: <span className="font-semibold text-white">{fmt(pnlData.totalEarned)}</span></span>
+                  <span>Spent: <span className="font-semibold text-white">{fmt(pnlData.totalSpent)}</span></span>
+                </div>
+              </div>
+            )}
+
+            {/* Chart + Top products */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
               <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-4 sm:p-5 shadow-sm">
                 <h2 className="text-sm sm:text-base font-semibold text-gray-700 mb-3 sm:mb-4">Revenue — Last 7 Days</h2>
@@ -167,15 +161,11 @@ export default function DashboardPage() {
                             {item.product?.name ?? "Unknown"}
                           </p>
                           <div className="h-1.5 bg-gray-100 rounded-full mt-1">
-                            <div
-                              className="h-1.5 bg-rose-400 rounded-full"
-                              style={{ width: `${Math.min(100, (item.totalQuantity / (data.topProducts[0]?.totalQuantity || 1)) * 100)}%` }}
-                            />
+                            <div className="h-1.5 bg-rose-400 rounded-full"
+                              style={{ width: `${Math.min(100, (item.totalQuantity / (data.topProducts[0]?.totalQuantity || 1)) * 100)}%` }} />
                           </div>
                         </div>
-                        <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
-                          {item.totalQuantity} sold
-                        </span>
+                        <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">{item.totalQuantity} sold</span>
                       </div>
                     ))}
                   </div>
@@ -183,25 +173,19 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Expiring Soon Warning */}
+            {/* Expiring Soon */}
             {data.expiringProducts.length > 0 && (
               <div className="bg-white rounded-xl border border-amber-100 p-4 sm:p-5 shadow-sm mb-4">
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <div className="flex items-center gap-2 mb-3">
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
-                  <h2 className="text-sm sm:text-base font-semibold text-gray-700">Expiring Soon Warning</h2>
+                  <h2 className="text-sm sm:text-base font-semibold text-gray-700">Expiring Soon</h2>
                 </div>
-
-                {/* Table on desktop */}
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b border-gray-100">
-                        <th className="pb-2 font-medium">Product</th>
-                        <th className="pb-2 font-medium">Category</th>
-                        <th className="pb-2 font-medium">Expiry Date</th>
-                        <th className="pb-2 font-medium">Stock</th>
-                      </tr>
-                    </thead>
+                    <thead><tr className="text-left text-gray-500 border-b border-gray-100">
+                      <th className="pb-2 font-medium">Product</th><th className="pb-2 font-medium">Category</th>
+                      <th className="pb-2 font-medium">Expiry Date</th><th className="pb-2 font-medium">Stock</th>
+                    </tr></thead>
                     <tbody>
                       {data.expiringProducts.map((p) => {
                         const days = daysUntilExpiry(p.expiryDate);
@@ -222,21 +206,14 @@ export default function DashboardPage() {
                     </tbody>
                   </table>
                 </div>
-
-                {/* Cards on mobile */}
                 <div className="sm:hidden space-y-2">
                   {data.expiringProducts.map((p) => {
                     const days = daysUntilExpiry(p.expiryDate);
-                    const isUrgent = days <= 30;
                     return (
                       <div key={p.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800">{p.name}</p>
-                          <p className="text-xs text-gray-500">{p.category.name} · Stock: {p.stock}</p>
-                        </div>
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${isUrgent ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
-                          {days}d left
-                        </span>
+                        <div><p className="text-sm font-semibold text-gray-800">{p.name}</p>
+                          <p className="text-xs text-gray-500">{p.category.name} · Stock: {p.stock}</p></div>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${days <= 30 ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>{days}d left</span>
                       </div>
                     );
                   })}
@@ -244,25 +221,19 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Low Stock Warning */}
+            {/* Low Stock */}
             {data.lowStockProducts.length > 0 && (
               <div className="bg-white rounded-xl border border-orange-100 p-4 sm:p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <div className="flex items-center gap-2 mb-3">
                   <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
                   <h2 className="text-sm sm:text-base font-semibold text-gray-700">Low Stock Warning</h2>
                 </div>
-
-                {/* Table on desktop */}
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-gray-500 border-b border-gray-100">
-                        <th className="pb-2 font-medium">Product</th>
-                        <th className="pb-2 font-medium">Category</th>
-                        <th className="pb-2 font-medium">Stock</th>
-                        <th className="pb-2 font-medium">Alert Threshold</th>
-                      </tr>
-                    </thead>
+                    <thead><tr className="text-left text-gray-500 border-b border-gray-100">
+                      <th className="pb-2 font-medium">Product</th><th className="pb-2 font-medium">Category</th>
+                      <th className="pb-2 font-medium">Stock</th><th className="pb-2 font-medium">Threshold</th>
+                    </tr></thead>
                     <tbody>
                       {data.lowStockProducts.map((p) => (
                         <tr key={p.id} className="border-b border-gray-50">
@@ -279,15 +250,11 @@ export default function DashboardPage() {
                     </tbody>
                   </table>
                 </div>
-
-                {/* Cards on mobile */}
                 <div className="sm:hidden space-y-2">
                   {data.lowStockProducts.map((p) => (
                     <div key={p.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">{p.name}</p>
-                        <p className="text-xs text-gray-500">{p.category.name}</p>
-                      </div>
+                      <div><p className="text-sm font-semibold text-gray-800">{p.name}</p>
+                        <p className="text-xs text-gray-500">{p.category.name}</p></div>
                       <span className={`text-xs font-semibold px-2 py-1 rounded-full ${p.stock === 0 ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600"}`}>
                         {p.stock} left
                       </span>
