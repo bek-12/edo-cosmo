@@ -14,6 +14,7 @@ import {
   X,
   User,
   RotateCcw,
+  PackagePlus,
 } from "lucide-react";
 import { removeToken, getUser, DecodedUser } from "@/lib/auth";
 import api from "@/lib/api";
@@ -24,11 +25,12 @@ interface ShopSettings {
 }
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/inventory", label: "Inventory", icon: Package },
-  { href: "/sales", label: "Sales (POS)", icon: ShoppingCart },
-  { href: "/reports", label: "Reports", icon: BarChart2 },
-  { href: "/returns", label: "Returns", icon: RotateCcw },
+  { href: "/dashboard",  label: "Dashboard",     icon: LayoutDashboard },
+  { href: "/inventory",  label: "Inventory",     icon: Package },
+  { href: "/sales",      label: "Sales (POS)",   icon: ShoppingCart },
+  { href: "/reports",    label: "Reports",       icon: BarChart2 },
+  { href: "/returns",    label: "Returns",       icon: RotateCcw },
+  { href: "/stock",      label: "Stock History", icon: PackagePlus },
 ];
 
 // ── Shared nav content (used in both desktop sidebar + mobile drawer) ──────

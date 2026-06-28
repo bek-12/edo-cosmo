@@ -13,7 +13,7 @@ interface PnLPeriod {
 }
 
 async function calcPnL(start: Date): Promise<PnLPeriod> {
-  const [salesAgg, returnsAgg] = await Promise.all([
+  const [salesAgg, returnsAgg, spendAgg] = await Promise.all([
     prisma.sale.aggregate({
       where: { createdAt: { gte: start } },
       _sum: { totalAmount: true },
@@ -22,23 +22,17 @@ async function calcPnL(start: Date): Promise<PnLPeriod> {
       where: { createdAt: { gte: start } },
       _sum: { totalAmount: true },
     }),
+    prisma.stockPurchase.aggregate({
+      where: { createdAt: { gte: start } },
+      _sum: { totalCost: true },
+    }),
   ]);
+
   const totalEarned =
     (salesAgg._sum.totalAmount ?? 0) - (returnsAgg._sum.totalAmount ?? 0);
+  const totalSpent = spendAgg._sum.totalCost ?? 0;
+  const netProfit  = totalEarned - totalSpent;
 
-  const items = await prisma.saleItem.findMany({
-    where: { sale: { createdAt: { gte: start } } },
-    select: {
-      quantity: true,
-      product: { select: { buyingPrice: true } },
-    },
-  });
-  const totalSpent = items.reduce(
-    (sum, item) => sum + item.quantity * item.product.buyingPrice,
-    0
-  );
-
-  const netProfit = totalEarned - totalSpent;
   return { totalEarned, totalSpent, netProfit, isLoss: netProfit < 0 };
 }
 

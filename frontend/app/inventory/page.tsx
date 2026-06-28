@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
-import { Plus, Pencil, Trash2, X, AlertTriangle, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, X, AlertTriangle, Search, PackagePlus } from "lucide-react";
 import axios from "axios";
 
 interface Category { id: string; name: string; }
@@ -89,6 +89,14 @@ export default function InventoryPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showLossConfirm, setShowLossConfirm] = useState(false);
   const [showNoExpiryConfirm, setShowNoExpiryConfirm] = useState(false);
+
+  // Restock state
+  const [restockProduct, setRestockProduct] = useState<Product | null>(null);
+  const [restockQty, setRestockQty] = useState("");
+  const [restockPrice, setRestockPrice] = useState("");
+  const [restockNote, setRestockNote] = useState("");
+  const [restockSaving, setRestockSaving] = useState(false);
+  const [restockSuccess, setRestockSuccess] = useState("");
 
   const fetchData = async () => {
     try {
@@ -177,6 +185,40 @@ export default function InventoryPage() {
   const handleDelete = async (id: string) => {
     try { await api.delete(`/api/products/${id}`); setDeleteId(null); fetchData(); }
     catch (err) { console.error(err); }
+  };
+
+  const openRestock = (p: Product) => {
+    setRestockProduct(p);
+    setRestockQty("");
+    setRestockPrice(String(p.buyingPrice));
+    setRestockNote("");
+    setRestockSuccess("");
+  };
+
+  const handleRestock = async () => {
+    if (!restockProduct) return;
+    const qty = Number(restockQty);
+    const bp  = Number(restockPrice);
+    if (!qty || qty < 1 || !bp || bp < 0) return;
+    setRestockSaving(true);
+    try {
+      await api.post("/api/stock/restock", {
+        productId: restockProduct.id,
+        quantity: qty,
+        buyingPrice: bp,
+        note: restockNote || null,
+      });
+      const totalCost = qty * bp;
+      const fmtN = (n: number) =>
+        new Intl.NumberFormat("en-ET", { style: "currency", currency: "ETB", maximumFractionDigits: 0 })
+          .format(n).replace("ETB", "Birr");
+      setRestockSuccess(`Stock updated! Added ${qty} units. Total cost: ${fmtN(totalCost)}`);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRestockSaving(false);
+    }
   };
 
   const fmt = (n: number) =>
@@ -295,8 +337,9 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-3 sm:px-4 py-3">
                           <div className="flex gap-1">
-                            <button onClick={() => openEdit(p)} className="p-2 rounded-lg text-gray-400 hover:text-rose-500 hover:bg-rose-50"><Pencil className="w-4 h-4" /></button>
-                            <button onClick={() => setDeleteId(p.id)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
+                            <button onClick={() => openEdit(p)} className="p-2 rounded-lg text-gray-400 hover:text-rose-500 hover:bg-rose-50" title="Edit"><Pencil className="w-4 h-4" /></button>
+                            <button onClick={() => openRestock(p)} className="p-2 rounded-lg text-gray-400 hover:text-indigo-500 hover:bg-indigo-50" title="Restock"><PackagePlus className="w-4 h-4" /></button>
+                            <button onClick={() => setDeleteId(p.id)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50" title="Delete"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
                       </tr>
@@ -479,6 +522,73 @@ export default function InventoryPage() {
           </div>
         </div>
       )}
+      {/* ── Restock Modal ── */}
+      {restockProduct && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md animate-slide-up sm:animate-none">
+            <div className="drag-handle sm:hidden mt-3" />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-semibold text-gray-800">Restock — {restockProduct.name}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Current stock: <span className="font-semibold text-gray-600">{restockProduct.stock} units</span></p>
+              </div>
+              <button onClick={() => setRestockProduct(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+
+            {restockSuccess ? (
+              <div className="px-5 py-8 text-center">
+                <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <PackagePlus className="w-6 h-6 text-indigo-600" />
+                </div>
+                <p className="text-sm font-semibold text-gray-800">{restockSuccess}</p>
+                <button onClick={() => setRestockProduct(null)}
+                  className="mt-5 px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm font-medium">
+                  Done
+                </button>
+              </div>
+            ) : (
+              <div className="px-5 py-4 space-y-4 pb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to Add</label>
+                  <input type="number" value={restockQty} onChange={(e) => setRestockQty(e.target.value)}
+                    min="1" placeholder="e.g. 10"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Buying Price per Unit</label>
+                  <input type="number" value={restockPrice} onChange={(e) => setRestockPrice(e.target.value)}
+                    min="0"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Note <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <input type="text" value={restockNote} onChange={(e) => setRestockNote(e.target.value)}
+                    placeholder="e.g. New shipment from supplier"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                {restockQty && restockPrice && Number(restockQty) > 0 && Number(restockPrice) > 0 && (
+                  <div className="flex items-center justify-between px-4 py-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">Total Cost</span>
+                    <span className="text-lg font-bold text-indigo-600">
+                      {new Intl.NumberFormat("en-ET", { style: "currency", currency: "ETB", maximumFractionDigits: 0 })
+                        .format(Number(restockQty) * Number(restockPrice)).replace("ETB", "Birr")}
+                    </span>
+                  </div>
+                )}
+                <div className="flex gap-3 pt-1">
+                  <button onClick={() => setRestockProduct(null)}
+                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600">Cancel</button>
+                  <button onClick={handleRestock} disabled={restockSaving || !restockQty || !restockPrice || Number(restockQty) < 1}
+                    className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-200 disabled:text-gray-400 text-white px-4 py-2.5 rounded-lg text-sm font-medium">
+                    {restockSaving ? "Saving..." : "Confirm Restock"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </Layout>
   );
 }

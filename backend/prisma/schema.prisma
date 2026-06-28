@@ -8,15 +8,16 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  password     String
-  role         Role     @default(CASHIER)
-  profileImage String?
-  createdAt    DateTime @default(now())
-  sales        Sale[]
-  returns      Return[]
+  id              String          @id @default(cuid())
+  name            String
+  email           String          @unique
+  password        String
+  role            Role            @default(CASHIER)
+  profileImage    String?
+  createdAt       DateTime        @default(now())
+  sales           Sale[]
+  returns         Return[]
+  stockPurchases  StockPurchase[]
 }
 
 model ShopSettings {
@@ -39,20 +40,34 @@ model Category {
 }
 
 model Product {
-  id            String       @id @default(cuid())
-  name          String
-  baseName      String?
-  categoryId    String
-  category      Category     @relation(fields: [categoryId], references: [id])
-  buyingPrice   Float
-  sellingPrice  Float
-  stock         Int          @default(0)
-  lowStockAlert Int          @default(5)
-  expiryDate    DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  saleItems     SaleItem[]
-  returnItems   ReturnItem[]
+  id              String          @id @default(cuid())
+  name            String
+  baseName        String?
+  categoryId      String
+  category        Category        @relation(fields: [categoryId], references: [id])
+  buyingPrice     Float
+  sellingPrice    Float
+  stock           Int             @default(0)
+  lowStockAlert   Int             @default(5)
+  expiryDate      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  saleItems       SaleItem[]
+  returnItems     ReturnItem[]
+  stockPurchases  StockPurchase[]
+}
+
+model StockPurchase {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  buyingPrice Float
+  totalCost   Float
+  note        String?
+  createdAt   DateTime @default(now())
+  cashierId   String
+  cashier     User     @relation(fields: [cashierId], references: [id])
 }
 
 model Sale {
