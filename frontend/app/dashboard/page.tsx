@@ -84,7 +84,7 @@ export default function DashboardPage() {
   const daysUntilExpiry = (d: string) =>
     Math.ceil((new Date(d).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 
-  const pnlData = data?.pnl[pnlPeriod];
+  const pnlData = data?.pnl?.[pnlPeriod];
 
   return (
     <Layout>
@@ -130,21 +130,21 @@ export default function DashboardPage() {
           <>
             {/* Stat cards — 4 regular + 1 P&L compact card */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-5">
-              <StatCard title="Net Revenue" value={fmt(data.totalRevenue)} icon={DollarSign} color="bg-rose-500"
+              <StatCard title="Net Revenue" value={fmt(data.totalRevenue ?? 0)} icon={DollarSign} color="bg-rose-500"
                 subtitle="All time (after returns)"
-                subtitleRed={data.totalReturnsAmount > 0 ? `− ${fmt(data.totalReturnsAmount)} returned` : undefined} />
-              <StatCard title="Today's Revenue" value={fmt(data.revenueToday)} icon={TrendingUp} color="bg-pink-500"
+                subtitleRed={(data.totalReturnsAmount ?? 0) > 0 ? `− ${fmt(data.totalReturnsAmount ?? 0)} returned` : undefined} />
+              <StatCard title="Today's Revenue" value={fmt(data.revenueToday ?? 0)} icon={TrendingUp} color="bg-pink-500"
                 subtitle="Net today"
-                subtitleRed={data.returnsTodayAmount > 0 ? `− ${fmt(data.returnsTodayAmount)} returned` : undefined} />
-              <StatCard title="Sales Today"  value={String(data.totalSalesToday)}         icon={ShoppingBag}   color="bg-purple-500" subtitle="Transactions" />
-              <StatCard title="Low Stock"    value={String(data.lowStockProducts.length)} icon={AlertTriangle} color="bg-orange-500" subtitle="Need restock" />
+                subtitleRed={(data.returnsTodayAmount ?? 0) > 0 ? `− ${fmt(data.returnsTodayAmount ?? 0)} returned` : undefined} />
+              <StatCard title="Sales Today"  value={String(data.totalSalesToday ?? 0)}              icon={ShoppingBag}   color="bg-purple-500" subtitle="Transactions" />
+              <StatCard title="Low Stock"    value={String((data.lowStockProducts ?? []).length)}   icon={AlertTriangle} color="bg-orange-500" subtitle="Need restock" />
 
               {/* P&L compact card — spans 2 cols on mobile, 1 col on desktop */}
               {pnlData && (
                 <div className={`col-span-2 lg:col-span-1 rounded-xl p-3 sm:p-4 shadow-sm flex flex-col justify-between ${
-                  pnlData.netProfit > 0
+                  (pnlData.netProfit ?? 0) > 0
                     ? "bg-gradient-to-br from-emerald-500 to-green-600"
-                    : pnlData.netProfit < 0
+                    : (pnlData.netProfit ?? 0) < 0
                     ? "bg-gradient-to-br from-rose-600 to-red-700"
                     : "bg-gradient-to-br from-amber-400 to-orange-500"
                 }`}>
@@ -161,11 +161,11 @@ export default function DashboardPage() {
                   </div>
                   <div className="my-1 sm:my-2">
                     <p className="text-lg sm:text-2xl font-bold text-white leading-tight truncate">
-                      {pnlData.isLoss ? "−" : "+"}{fmt(Math.abs(pnlData.netProfit))}
+                      {(pnlData.isLoss ?? false) ? "−" : "+"}{fmt(Math.abs(pnlData.netProfit ?? 0))}
                     </p>
                   </div>
-                  <p className={`text-xs font-semibold ${pnlData.netProfit < 0 ? "text-red-200" : pnlData.netProfit === 0 ? "text-orange-100" : "text-green-100"}`}>
-                    {pnlData.netProfit > 0 ? "▲ Net Profit" : pnlData.netProfit < 0 ? "▼ Net Loss" : "◆ Break Even"}
+                  <p className={`text-xs font-semibold ${(pnlData.netProfit ?? 0) < 0 ? "text-red-200" : (pnlData.netProfit ?? 0) === 0 ? "text-orange-100" : "text-green-100"}`}>
+                    {(pnlData.netProfit ?? 0) > 0 ? "▲ Net Profit" : (pnlData.netProfit ?? 0) < 0 ? "▼ Net Loss" : "◆ Break Even"}
                   </p>
                 </div>
               )}
@@ -176,7 +176,7 @@ export default function DashboardPage() {
               <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-4 sm:p-5 shadow-sm">
                 <h2 className="text-sm sm:text-base font-semibold text-gray-700 mb-3 sm:mb-4">Revenue — Last 7 Days</h2>
                 <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={data.revenueLastDays}>
+                  <LineChart data={data.revenueLastDays ?? []}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 11 }} />
                     <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
@@ -189,11 +189,11 @@ export default function DashboardPage() {
 
               <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-5 shadow-sm">
                 <h2 className="text-sm sm:text-base font-semibold text-gray-700 mb-3 sm:mb-4">Top 5 Products</h2>
-                {data.topProducts.length === 0 ? (
+                {(data.topProducts ?? []).length === 0 ? (
                   <p className="text-sm text-gray-400">No sales data yet</p>
                 ) : (
                   <div className="space-y-3">
-                    {data.topProducts.map((item, i) => (
+                    {(data.topProducts ?? []).map((item, i) => (
                       <div key={i} className="flex items-center gap-2 sm:gap-3">
                         <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
                         <div className="flex-1 min-w-0">
@@ -202,7 +202,7 @@ export default function DashboardPage() {
                           </p>
                           <div className="h-1.5 bg-gray-100 rounded-full mt-1">
                             <div className="h-1.5 bg-rose-400 rounded-full"
-                              style={{ width: `${Math.min(100, (item.totalQuantity / (data.topProducts[0]?.totalQuantity || 1)) * 100)}%` }} />
+                              style={{ width: `${Math.min(100, (item.totalQuantity / ((data.topProducts ?? [])[0]?.totalQuantity || 1)) * 100)}%` }} />
                           </div>
                         </div>
                         <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">{item.totalQuantity} sold</span>
@@ -214,7 +214,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Expiring Soon */}
-            {data.expiringProducts.length > 0 && (
+            {(data.expiringProducts ?? []).length > 0 && (
               <div className="bg-white rounded-xl border border-amber-100 p-4 sm:p-5 shadow-sm mb-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
@@ -227,7 +227,7 @@ export default function DashboardPage() {
                       <th className="pb-2 font-medium">Expiry Date</th><th className="pb-2 font-medium">Stock</th>
                     </tr></thead>
                     <tbody>
-                      {data.expiringProducts.map((p) => {
+                      {(data.expiringProducts ?? []).map((p) => {
                         const days = daysUntilExpiry(p.expiryDate);
                         const isUrgent = days <= 30;
                         return (
@@ -247,7 +247,7 @@ export default function DashboardPage() {
                   </table>
                 </div>
                 <div className="sm:hidden space-y-2">
-                  {data.expiringProducts.map((p) => {
+                  {(data.expiringProducts ?? []).map((p) => {
                     const days = daysUntilExpiry(p.expiryDate);
                     return (
                       <div key={p.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg">
@@ -262,7 +262,7 @@ export default function DashboardPage() {
             )}
 
             {/* Low Stock */}
-            {data.lowStockProducts.length > 0 && (
+            {(data.lowStockProducts ?? []).length > 0 && (
               <div className="bg-white rounded-xl border border-orange-100 p-4 sm:p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
@@ -275,7 +275,7 @@ export default function DashboardPage() {
                       <th className="pb-2 font-medium">Stock</th><th className="pb-2 font-medium">Threshold</th>
                     </tr></thead>
                     <tbody>
-                      {data.lowStockProducts.map((p) => (
+                      {(data.lowStockProducts ?? []).map((p) => (
                         <tr key={p.id} className="border-b border-gray-50">
                           <td className="py-2.5 font-medium text-gray-700">{p.name}</td>
                           <td className="py-2.5 text-gray-500">{p.category.name}</td>
@@ -291,7 +291,7 @@ export default function DashboardPage() {
                   </table>
                 </div>
                 <div className="sm:hidden space-y-2">
-                  {data.lowStockProducts.map((p) => (
+                  {(data.lowStockProducts ?? []).map((p) => (
                     <div key={p.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                       <div><p className="text-sm font-semibold text-gray-800">{p.name}</p>
                         <p className="text-xs text-gray-500">{p.category.name}</p></div>
