@@ -25,10 +25,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <Sidebar />
-      {/* pt-14 accounts for the fixed mobile top navbar; removed on lg+ */}
-      <main className="flex-1 overflow-auto pt-14 lg:pt-0 scroll-touch">
+      {/* pt-14 = mobile top navbar height, lg:pl-64 = fixed sidebar width */}
+      <main className="lg:pl-64 pt-14 lg:pt-0 min-h-screen overflow-auto scroll-touch">
         {children}
       </main>
     </div>

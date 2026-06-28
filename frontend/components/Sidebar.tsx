@@ -47,8 +47,8 @@ function NavContent({
 }) {
   return (
     <>
-      {/* Logo */}
-      <div className="px-6 py-5 border-b border-rose-100">
+      {/* TOP — logo, never shrinks */}
+      <div className="flex-shrink-0 px-6 py-5 border-b border-rose-100">
         <div className="flex items-center gap-2">
           {shop.shopLogo ? (
             <img
@@ -64,8 +64,8 @@ function NavContent({
         <p className="text-xs text-gray-400 mt-0.5">Cosmetics Management</p>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+      {/* MIDDLE — nav links, scrolls only if needed */}
+      <nav className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-1 scrollbar-thin scrollbar-thumb-rose-100">
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
@@ -86,12 +86,12 @@ function NavContent({
         })}
       </nav>
 
-      {/* Profile + user + logout */}
-      <div className="px-4 py-4 border-t border-rose-100">
+      {/* BOTTOM — profile + user + logout, always pinned, never shrinks */}
+      <div className="flex-shrink-0 px-4 pt-3 pb-6 border-t border-rose-100">
         <Link
           href="/profile"
           onClick={onNavigate}
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors mb-1 ${
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-1 ${
             pathname === "/profile"
               ? "bg-rose-50 text-rose-600"
               : "text-gray-600 hover:bg-gray-50 hover:text-rose-500"
@@ -104,7 +104,7 @@ function NavContent({
         </Link>
 
         {user && (
-          <div className="mb-2 px-3 py-1">
+          <div className="mb-1 px-3 py-1">
             <p className="text-sm font-semibold text-gray-700 truncate">{user.name}</p>
             <span
               className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium mt-0.5 ${
@@ -120,7 +120,7 @@ function NavContent({
 
         <button
           onClick={onLogout}
-          className="flex items-center gap-3 w-full px-3 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-500 transition-colors"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-500 transition-colors"
         >
           <LogOut className="w-5 h-5 text-gray-400 flex-shrink-0" />
           Logout
@@ -182,7 +182,7 @@ export default function Sidebar() {
   return (
     <>
       {/* ── DESKTOP sidebar (lg+) ─────────────────────────────────────────── */}
-      <aside className="hidden lg:flex w-64 min-h-screen bg-white border-r border-rose-100 flex-col shadow-sm flex-shrink-0">
+      <aside className="hidden lg:flex w-64 h-screen fixed top-0 left-0 bg-white border-r border-rose-100 flex-col shadow-sm flex-shrink-0 overflow-hidden z-30">
         <NavContent
           shop={shop}
           user={user}
