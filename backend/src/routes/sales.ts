@@ -15,11 +15,9 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
           select: {
             id: true,
             productId: true,
-            variantId: true,
             quantity: true,
             priceAtSale: true,
             product: { select: { id: true, name: true } },
-            variant: { select: { id: true, variantType: true, variantValue: true } },
           },
         },
       },
@@ -35,7 +33,7 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
 // POST /api/sales
 router.post("/", authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const { items } = req.body as {
-    items: { productId: string; variantId?: string; quantity: number; priceAtSale: number }[];
+    items: { productId: string; quantity: number; priceAtSale: number }[];
   };
 
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -46,40 +44,22 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response): Promise<
   const cashierId = req.user!.id;
 
   try {
-    // Validate stock for all items
+    // Validate stock
     for (const item of items) {
-      if (item.variantId) {
-        const variant = await prisma.productVariant.findUnique({ where: { id: item.variantId } });
-        if (!variant) {
-          res.status(404).json({ message: `Variant ${item.variantId} not found` });
-          return;
-        }
-        if (variant.stock < item.quantity) {
-          const product = await prisma.product.findUnique({ where: { id: item.productId } });
-          res.status(400).json({
-            message: `Insufficient stock for "${product?.name}" variant. Available: ${variant.stock}`,
-          });
-          return;
-        }
-      } else {
-        const product = await prisma.product.findUnique({ where: { id: item.productId } });
-        if (!product) {
-          res.status(404).json({ message: `Product ${item.productId} not found` });
-          return;
-        }
-        if (product.stock < item.quantity) {
-          res.status(400).json({
-            message: `Insufficient stock for "${product.name}". Available: ${product.stock}`,
-          });
-          return;
-        }
+      const product = await prisma.product.findUnique({ where: { id: item.productId } });
+      if (!product) {
+        res.status(404).json({ message: `Product ${item.productId} not found` });
+        return;
+      }
+      if (product.stock < item.quantity) {
+        res.status(400).json({
+          message: `Insufficient stock for "${product.name}". Available: ${product.stock}`,
+        });
+        return;
       }
     }
 
-    const totalAmount = items.reduce(
-      (sum, item) => sum + item.priceAtSale * item.quantity,
-      0
-    );
+    const totalAmount = items.reduce((sum, item) => sum + item.priceAtSale * item.quantity, 0);
 
     const sale = await prisma.$transaction(async (tx) => {
       const newSale = await tx.sale.create({
@@ -89,7 +69,6 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response): Promise<
           items: {
             create: items.map((item) => ({
               productId: item.productId,
-              variantId: item.variantId ?? null,
               quantity: item.quantity,
               priceAtSale: item.priceAtSale,
             })),
@@ -97,28 +76,15 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response): Promise<
         },
         include: {
           cashier: { select: { id: true, name: true, email: true } },
-          items: {
-            include: {
-              product: { select: { id: true, name: true } },
-              variant: { select: { id: true, variantType: true, variantValue: true } },
-            },
-          },
+          items: { include: { product: { select: { id: true, name: true } } } },
         },
       });
 
-      // Deduct stock
       for (const item of items) {
-        if (item.variantId) {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
-            data: { stock: { decrement: item.quantity } },
-          });
-        } else {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } },
-          });
-        }
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
       }
 
       return newSale;

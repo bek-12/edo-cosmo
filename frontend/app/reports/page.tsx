@@ -13,7 +13,6 @@ import axios from "axios";
 interface SaleItem {
   id: string; productId: string;
   product: { name: string };
-  variant?: { id: string; variantType: string; variantValue: string } | null;
   quantity: number; priceAtSale: number;
 }
 interface ReturnItem { productId: string; quantity: number; maxQty: number; priceAtSale: number; productName: string; }
@@ -23,7 +22,7 @@ interface Sale {
   cashier: { name: string }; items: SaleItem[]; returns?: SaleReturn[];
 }
 interface SummaryTopProduct {
-  productName: string; variantValue: string | null; unitsSold: number; revenue: number;
+  productName: string; unitsSold: number; revenue: number;
 }
 interface SummaryDay { label: string; revenue: number; spent: number; }
 interface SummaryData {
@@ -54,8 +53,8 @@ function exportCSV(summary: SummaryData) {
     ["Net Profit", summary.netProfit],
     ["Return Rate", `${summary.returnRate}%`],
     [],
-    ["Rank", "Product", "Variant", "Units Sold", "Revenue"],
-    ...summary.topProducts.map((p, i) => [i + 1, p.productName, p.variantValue ?? "", p.unitsSold, p.revenue]),
+    ["Rank", "Product", "Units Sold", "Revenue"],
+    ...summary.topProducts.map((p, i) => [i + 1, p.productName, p.unitsSold, p.revenue]),
   ];
   const csv = rows.map((r) => r.join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
@@ -155,7 +154,6 @@ function SummarySection() {
                     <tr className="text-left text-gray-400 text-xs border-b border-gray-100">
                       <th className="pb-2 font-medium w-8">#</th>
                       <th className="pb-2 font-medium">Product</th>
-                      <th className="pb-2 font-medium hidden sm:table-cell">Variant</th>
                       <th className="pb-2 font-medium text-right">Units</th>
                       <th className="pb-2 font-medium text-right">Revenue</th>
                     </tr>
@@ -167,7 +165,6 @@ function SummarySection() {
                       <tr key={i} className="border-b border-gray-50">
                         <td className="py-2 text-gray-400 font-bold text-xs">{i + 1}</td>
                         <td className="py-2 font-medium text-gray-700 text-xs">{p.productName}</td>
-                        <td className="py-2 text-gray-400 text-xs hidden sm:table-cell">{p.variantValue ?? "—"}</td>
                         <td className="py-2 text-right text-gray-600 text-xs">{p.unitsSold}</td>
                         <td className="py-2 text-right font-semibold text-rose-600 text-xs">{fmt(p.revenue)}</td>
                       </tr>
@@ -234,9 +231,7 @@ export default function ReportsPage() {
         quantity: 0,
         maxQty: si.quantity - (alreadyReturned[si.productId] ?? 0),
         priceAtSale: si.priceAtSale,
-        productName: si.variant
-          ? `${si.product.name} · ${si.variant.variantType} ${si.variant.variantValue}`
-          : si.product.name,
+        productName: si.product.name,
       })));
     } catch { setEligibility(null); }
   };
@@ -348,7 +343,7 @@ export default function ReportsPage() {
                             <div className="flex flex-wrap gap-1">
                               {s.items.map((item) => (
                                 <span key={item.id} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                                  {item.product.name}{item.variant ? ` · ${item.variant.variantValue}` : ""} ×{item.quantity}
+                                  {item.product.name} ×{item.quantity}
                                 </span>
                               ))}
                             </div>
@@ -387,7 +382,7 @@ export default function ReportsPage() {
                     <div className="flex flex-wrap gap-1 mb-3">
                       {s.items.map((item) => (
                         <span key={item.id} className="text-xs bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full font-medium">
-                          {item.product.name}{item.variant ? ` · ${item.variant.variantValue}` : ""} ×{item.quantity}
+                          {item.product.name} ×{item.quantity}
                         </span>
                       ))}
                     </div>

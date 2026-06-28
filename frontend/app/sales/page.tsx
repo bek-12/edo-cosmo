@@ -6,19 +6,8 @@ import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, AlertTriangle, 
 import axios from "axios";
 
 interface Category { id: string; name: string; }
-interface ProductVariant { id: string; variantType: string; variantValue: string; stock: number; sellingPrice: number | null; }
-interface Product {
-  id: string; name: string; category: Category;
-  sellingPrice: number; stock: number;
-  hasVariants: boolean; variants: ProductVariant[];
-}
-interface CartItem {
-  product: Product;
-  quantity: number;
-  variantId?: string;
-  variantLabel?: string;
-  priceAtSale: number;
-}
+interface Product { id: string; name: string; category: Category; sellingPrice: number; stock: number; }
+interface CartItem { product: Product; quantity: number; priceAtSale: number; }
 
 export default function SalesPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -31,8 +20,6 @@ export default function SalesPage() {
   const [success, setSuccess] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
-  // Variant picker
-  const [variantProduct, setVariantProduct] = useState<Product | null>(null);
 
   const fetchData = async () => {
     try {
@@ -44,63 +31,38 @@ export default function SalesPage() {
   useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
-    document.body.style.overflow = (cartOpen || variantProduct !== null) ? "hidden" : "";
+    document.body.style.overflow = cartOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [cartOpen, variantProduct]);
+  }, [cartOpen]);
 
   const filtered = products.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchCat = selectedCategory ? p.category.id === selectedCategory : true;
-    const hasStock = p.hasVariants ? p.variants.some((v) => v.stock > 0) : p.stock > 0;
-    return matchSearch && matchCat && hasStock;
+    return matchSearch && matchCat && p.stock > 0;
   });
 
-  const cartKey = (productId: string, variantId?: string) => `${productId}:${variantId ?? ""}`;
-
-  const addToCart = (product: Product, variantId?: string, variantLabel?: string, price?: number) => {
-    const key = cartKey(product.id, variantId);
-    const maxStock = variantId
-      ? (product.variants.find((v) => v.id === variantId)?.stock ?? 0)
-      : product.stock;
-    const priceAtSale = price ?? product.sellingPrice;
-
+  const addToCart = (product: Product) => {
     setCart((prev) => {
-      const existing = prev.find((item) => cartKey(item.product.id, item.variantId) === key);
+      const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        if (existing.quantity >= maxStock) return prev;
+        if (existing.quantity >= product.stock) return prev;
         return prev.map((item) =>
-          cartKey(item.product.id, item.variantId) === key
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { product, quantity: 1, variantId, variantLabel, priceAtSale }];
+      return [...prev, { product, quantity: 1, priceAtSale: product.sellingPrice }];
     });
   };
 
-  const handleProductClick = (product: Product) => {
-    if (product.hasVariants && product.variants.length > 0) {
-      setVariantProduct(product);
-    } else {
-      addToCart(product);
-    }
-  };
-
-  const updateQty = (productId: string, variantId: string | undefined, delta: number) => {
-    const key = cartKey(productId, variantId);
+  const updateQty = (productId: string, delta: number) => {
     setCart((prev) =>
-      prev.map((item) =>
-        cartKey(item.product.id, item.variantId) === key
-          ? { ...item, quantity: item.quantity + delta }
-          : item
-      ).filter((item) => item.quantity > 0)
+      prev.map((item) => item.product.id === productId ? { ...item, quantity: item.quantity + delta } : item)
+          .filter((item) => item.quantity > 0)
     );
   };
 
-  const removeFromCart = (productId: string, variantId?: string) => {
-    const key = cartKey(productId, variantId);
-    setCart((prev) => prev.filter((item) => cartKey(item.product.id, item.variantId) !== key));
-  };
+  const removeFromCart = (productId: string) =>
+    setCart((prev) => prev.filter((item) => item.product.id !== productId));
 
   const totalAmount = cart.reduce((sum, item) => sum + item.priceAtSale * item.quantity, 0);
 
@@ -111,7 +73,6 @@ export default function SalesPage() {
       await api.post("/api/sales", {
         items: cart.map((item) => ({
           productId: item.product.id,
-          variantId: item.variantId ?? null,
           quantity: item.quantity,
           priceAtSale: item.priceAtSale,
         })),
@@ -147,43 +108,32 @@ export default function SalesPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {cart.map((item) => {
-              const key = cartKey(item.product.id, item.variantId);
-              const maxStock = item.variantId
-                ? (item.product.variants.find((v) => v.id === item.variantId)?.stock ?? 0)
-                : item.product.stock;
-              return (
-                <div key={key} className="flex items-start gap-2 p-2.5 bg-gray-50 rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-700 leading-tight">
-                      {item.product.name}
-                      {item.variantLabel && (
-                        <span className="text-gray-400 font-normal"> · {item.variantLabel}</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-400">{fmt(item.priceAtSale)} each</p>
-                    <p className="text-xs font-bold text-rose-600 mt-0.5">{fmt(item.priceAtSale * item.quantity)}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <button onClick={() => removeFromCart(item.product.id, item.variantId)} className="text-gray-300 hover:text-red-400">
-                      <Trash2 className="w-3.5 h-3.5" />
+            {cart.map((item) => (
+              <div key={item.product.id} className="flex items-start gap-2 p-2.5 bg-gray-50 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-700 leading-tight">{item.product.name}</p>
+                  <p className="text-xs text-gray-400">{fmt(item.priceAtSale)} each</p>
+                  <p className="text-xs font-bold text-rose-600 mt-0.5">{fmt(item.priceAtSale * item.quantity)}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <button onClick={() => removeFromCart(item.product.id)} className="text-gray-300 hover:text-red-400">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => updateQty(item.product.id, -1)}
+                      className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center">
+                      <Minus className="w-3 h-3" />
                     </button>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => updateQty(item.product.id, item.variantId, -1)}
-                        className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center">
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="text-xs font-semibold w-5 text-center">{item.quantity}</span>
-                      <button onClick={() => updateQty(item.product.id, item.variantId, 1)}
-                        disabled={item.quantity >= maxStock}
-                        className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center disabled:opacity-40">
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
+                    <span className="text-xs font-semibold w-5 text-center">{item.quantity}</span>
+                    <button onClick={() => updateQty(item.product.id, 1)}
+                      disabled={item.quantity >= item.product.stock}
+                      className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center disabled:opacity-40">
+                      <Plus className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -205,7 +155,7 @@ export default function SalesPage() {
       {filtered.map((p) => {
         const inCart = cart.some((c) => c.product.id === p.id);
         return (
-          <button key={p.id} onClick={() => handleProductClick(p)}
+          <button key={p.id} onClick={() => addToCart(p)}
             className={`text-left p-2.5 sm:p-3 rounded-xl border transition-all shadow-sm ${inCart ? "border-rose-400 bg-rose-50" : "border-gray-100 bg-white hover:border-rose-200 hover:bg-rose-50"}`}>
             <div className="w-full h-8 sm:h-10 bg-gradient-to-br from-rose-100 to-pink-100 rounded-lg mb-1.5 sm:mb-2 flex items-center justify-center">
               <span className="text-rose-400">✨</span>
@@ -213,11 +163,7 @@ export default function SalesPage() {
             <p className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2">{p.name}</p>
             <p className="text-xs text-gray-400 mt-0.5">{p.category.name}</p>
             <p className="text-sm font-bold text-rose-600 mt-1">{fmt(p.sellingPrice)}</p>
-            {p.hasVariants ? (
-              <p className="text-xs text-blue-500">{p.variants.length} variants</p>
-            ) : (
-              <p className="text-xs text-gray-400">×{p.stock}</p>
-            )}
+            <p className="text-xs text-gray-400">×{p.stock}</p>
           </button>
         );
       })}
@@ -227,7 +173,7 @@ export default function SalesPage() {
 
   return (
     <Layout>
-      {/* Desktop layout */}
+      {/* Desktop */}
       <div className="hidden lg:flex h-screen overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden p-4">
           <div className="mb-4">
@@ -263,7 +209,7 @@ export default function SalesPage() {
         </div>
       </div>
 
-      {/* Mobile layout */}
+      {/* Mobile */}
       <div className="lg:hidden flex flex-col pb-28">
         <div className="p-4">
           <h1 className="text-xl font-bold text-gray-800 mb-3">Point of Sale</h1>
@@ -293,9 +239,7 @@ export default function SalesPage() {
             className="w-full bg-rose-500 hover:bg-rose-600 text-white font-semibold py-3 rounded-xl text-sm flex items-center justify-between px-4 min-h-[44px]">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4" /><span>Cart</span>
-              {cart.length > 0 && (
-                <span className="bg-white text-rose-500 font-bold text-xs px-1.5 py-0.5 rounded-full">{cart.length}</span>
-              )}
+              {cart.length > 0 && <span className="bg-white text-rose-500 font-bold text-xs px-1.5 py-0.5 rounded-full">{cart.length}</span>}
             </div>
             <span className="font-bold">{fmt(totalAmount)}</span>
           </button>
@@ -312,63 +256,11 @@ export default function SalesPage() {
               <div className="flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-rose-500" />
                 <h2 className="font-semibold text-gray-800">Cart</h2>
-                {cart.length > 0 && (
-                  <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-2 py-0.5 rounded-full">
-                    {cart.length} item{cart.length !== 1 ? "s" : ""}
-                  </span>
-                )}
+                {cart.length > 0 && <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-2 py-0.5 rounded-full">{cart.length} item{cart.length !== 1 ? "s" : ""}</span>}
               </div>
               <button onClick={() => setCartOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             <CartItems />
-          </div>
-        </div>
-      )}
-
-      {/* Variant picker sheet */}
-      {variantProduct && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setVariantProduct(null)} />
-          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-sm animate-slide-up sm:animate-none">
-            <div className="drag-handle mt-3 sm:hidden" />
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h2 className="text-base font-semibold text-gray-800">
-                {variantProduct.name} — Select Variant
-              </h2>
-              <button onClick={() => setVariantProduct(null)} className="text-gray-400"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="px-4 py-3 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
-              {variantProduct.variants.map((v) => {
-                const price = v.sellingPrice ?? variantProduct.sellingPrice;
-                const outOfStock = v.stock === 0;
-                return (
-                  <button key={v.id}
-                    disabled={outOfStock}
-                    onClick={() => {
-                      addToCart(variantProduct, v.id, `${v.variantType} ${v.variantValue}`, price);
-                      setVariantProduct(null);
-                    }}
-                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all ${
-                      outOfStock
-                        ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
-                        : "border-rose-100 bg-white hover:border-rose-400 hover:bg-rose-50"
-                    }`}>
-                    <span className="text-base font-bold text-gray-800">{v.variantValue}</span>
-                    <span className="text-xs text-gray-400 capitalize mt-0.5">{v.variantType}</span>
-                    <span className="text-sm font-bold text-rose-600 mt-1">{fmt(price)}</span>
-                    <span className={`text-xs mt-0.5 ${outOfStock ? "text-red-400" : "text-gray-400"}`}>
-                      {outOfStock ? "Out of stock" : `×${v.stock}`}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="p-4 pt-2">
-              <button onClick={() => setVariantProduct(null)}
-                className="w-full py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600">
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
       )}
