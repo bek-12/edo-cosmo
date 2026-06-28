@@ -188,16 +188,22 @@ function ModalFormContent({ form, setForm, categories, error, saving, editProduc
         </div>
       </div>
 
-      {/* Variants toggle */}
-      <div className="flex items-center gap-3">
-        <button type="button"
-          onClick={() => setForm({ ...form, hasVariants: !form.hasVariants, variants: form.variants.length === 0 ? [{ variantValue: "", stock: "", buyingPrice: "", sellingPrice: "" }] : form.variants })}
-          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${form.hasVariants ? "bg-rose-500" : "bg-gray-200"}`}
-          role="switch" aria-checked={form.hasVariants}>
-          <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${form.hasVariants ? "translate-x-4" : "translate-x-0"}`} />
-        </button>
-        <span className="text-sm font-medium text-gray-700">This product has variants (shades/sizes)</span>
-      </div>
+      {/* Variants toggle — full row is clickable */}
+      <button
+        type="button"
+        onClick={() => setForm({ ...form, hasVariants: !form.hasVariants, variants: form.variants.length === 0 ? [{ variantValue: "", stock: "", buyingPrice: "", sellingPrice: "" }] : form.variants })}
+        className="flex items-center gap-3 w-full text-left focus:outline-none"
+        role="switch"
+        aria-checked={form.hasVariants}
+      >
+        {/* Toggle pill — 44×24px */}
+        <span className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 ${form.hasVariants ? "bg-rose-500" : "bg-gray-200"}`}>
+          <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-200 ${form.hasVariants ? "translate-x-5" : "translate-x-0"}`} />
+        </span>
+        <span className="text-sm font-medium text-gray-700 select-none">
+          This product has variants (shades/sizes)
+        </span>
+      </button>
 
       {/* Stock — only when no variants */}
       {!form.hasVariants && (
@@ -212,11 +218,16 @@ function ModalFormContent({ form, setForm, categories, error, saving, editProduc
         <div className="space-y-3 p-3 bg-blue-50 rounded-xl">
           <div>
             <p className="text-sm font-medium text-gray-700 mb-2">Variant Type</p>
-            <div className="flex gap-2">
+            {/* Segmented control */}
+            <div className="flex bg-gray-100 rounded-lg p-0.5">
               {["shade", "size", "other"].map((t) => (
                 <button key={t} type="button"
                   onClick={() => setForm({ ...form, variantType: t })}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors capitalize ${form.variantType === t ? "bg-rose-500 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-rose-50"}`}>
+                  className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all duration-150 capitalize ${
+                    form.variantType === t
+                      ? "bg-white text-gray-800 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}>
                   {t}
                 </button>
               ))}
