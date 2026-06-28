@@ -17,14 +17,24 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://edo-cosmo.vercel.app",
+  process.env.FRONTEND_URL,
+].filter(Boolean) as string[];
+
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    /\.vercel\.app$/,       // any vercel preview URL
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
-app.use(express.json({ limit: "10mb" })); // increased for base64 images
+app.use(express.json({ limit: "10mb" }));
 
 // Health check
 app.get("/health", (_req, res) => {
