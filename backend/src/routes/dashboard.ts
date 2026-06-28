@@ -27,26 +27,16 @@ async function calcPnL(startDate: Date): Promise<PnLPeriod> {
   const totalEarned =
     (salesResult._sum.totalAmount ?? 0) - (returnsResult._sum.totalAmount ?? 0);
 
-  // totalSpent = cost of inventory purchased in this period
-  // For products without variants: buyingPrice * stock at creation time
-  // For products with variants: sum of (variant.buyingPrice ?? product.buyingPrice) * variant.stock
+  // totalSpent = buyingPrice * stock for all products created in this period
   const productsCreated = await prisma.product.findMany({
     where: { createdAt: { gte: startDate } },
-    include: {
-      variants: { select: { stock: true, buyingPrice: true } },
-    },
+    select: { buyingPrice: true, stock: true },
   });
 
-  const totalSpent = productsCreated.reduce((sum, p) => {
-    if (p.hasVariants && p.variants.length > 0) {
-      const variantCost = p.variants.reduce((vs, v) => {
-        const bp = v.buyingPrice ?? p.buyingPrice;
-        return vs + bp * v.stock;
-      }, 0);
-      return sum + variantCost;
-    }
-    return sum + p.buyingPrice * p.stock;
-  }, 0);
+  const totalSpent = productsCreated.reduce(
+    (sum, p) => sum + p.buyingPrice * p.stock,
+    0
+  );
 
   const netProfit = totalEarned - totalSpent;
   return { totalSpent, totalEarned, netProfit, isLoss: netProfit < 0 };
@@ -60,10 +50,9 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
     const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
     const in90Days = new Date(startOfToday.getTime() + 90 * 24 * 60 * 60 * 1000);
 
-    // P&L period start dates
-    const weekStart = new Date(startOfToday.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const monthStart = new Date(startOfToday.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const yearStart = new Date(startOfToday.getTime() - 365 * 24 * 60 * 60 * 1000);
+    const weekStart  = new Date(startOfToday.getTime() - 7   * 24 * 60 * 60 * 1000);
+    const monthStart = new Date(startOfToday.getTime() - 30  * 24 * 60 * 60 * 1000);
+    const yearStart  = new Date(startOfToday.getTime() - 365 * 24 * 60 * 60 * 1000);
 
     // ── Sales revenue ────────────────────────────────────────────────────
     const totalSalesResult = await prisma.sale.aggregate({ _sum: { totalAmount: true } });
@@ -97,15 +86,13 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
     const totalRevenue = totalSalesRevenue - totalReturnsAmount;
     const revenueToday = salesTodayRevenue - returnsTodayAmount;
 
-    // ── Low stock ────────────────────────────────────────────────────────
-    const allProducts = await prisma.product.findMany({ include: { category: true, variants: true } });
-    const productsWithStock = allProducts.map((p) => {
-      const stock = p.hasVariants ? p.variants.reduce((s, v) => s + v.stock, 0) : p.stock;
-      return { ...p, stock };
+    // ── Low stock ─────────────────────────────────────────────────────────
+    const allProducts = await prisma.product.findMany({
+      include: { category: true },
     });
-    const lowStockProducts = productsWithStock.filter((p) => p.stock <= p.lowStockAlert);
+    const lowStockProducts = allProducts.filter((p) => p.stock <= p.lowStockAlert);
 
-    // ── Expiring products ────────────────────────────────────────────────
+    // ── Expiring products ─────────────────────────────────────────────────
     const expiringProducts = await prisma.product.findMany({
       where: { expiryDate: { not: null, gte: startOfToday, lte: in90Days } },
       select: {
@@ -115,7 +102,7 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       orderBy: { expiryDate: "asc" },
     });
 
-    // ── Top 5 products ───────────────────────────────────────────────────
+    // ── Top 5 products ────────────────────────────────────────────────────
     const topProductsRaw = await prisma.saleItem.groupBy({
       by: ["productId"],
       _sum: { quantity: true },
@@ -133,7 +120,7 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       })
     );
 
-    // ── Revenue last 7 days (net) ────────────────────────────────────────
+    // ── Revenue last 7 days (net) ─────────────────────────────────────────
     const revenueLastDays: { date: string; revenue: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
@@ -156,7 +143,7 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       });
     }
 
-    // ── P&L ─────────────────────────────────────────────────────────────
+    // ── P&L ───────────────────────────────────────────────────────────────
     const [weekly, monthly, yearly] = await Promise.all([
       calcPnL(weekStart),
       calcPnL(monthStart),
