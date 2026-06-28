@@ -13,7 +13,6 @@ interface PnLPeriod {
 }
 
 async function calcPnL(startDate: Date): Promise<PnLPeriod> {
-  // totalEarned = sales revenue - returns in period
   const [salesResult, returnsResult] = await Promise.all([
     prisma.sale.aggregate({
       where: { createdAt: { gte: startDate } },
@@ -24,10 +23,11 @@ async function calcPnL(startDate: Date): Promise<PnLPeriod> {
       _sum: { totalAmount: true },
     }),
   ]);
+
   const totalEarned =
     (salesResult._sum.totalAmount ?? 0) - (returnsResult._sum.totalAmount ?? 0);
 
-  // totalSpent = buyingPrice * stock for all products created in this period
+  // Spending = buyingPrice * stock for products created in this period
   const productsCreated = await prisma.product.findMany({
     where: { createdAt: { gte: startDate } },
     select: { buyingPrice: true, stock: true },
@@ -44,57 +44,60 @@ async function calcPnL(startDate: Date): Promise<PnLPeriod> {
 
 // GET /api/dashboard
 router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
+  console.log("Dashboard route hit");
   try {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
-    const in90Days = new Date(startOfToday.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const endOfToday   = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+    const in90Days     = new Date(startOfToday.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const weekStart    = new Date(startOfToday.getTime() - 7   * 24 * 60 * 60 * 1000);
+    const monthStart   = new Date(startOfToday.getTime() - 30  * 24 * 60 * 60 * 1000);
+    const yearStart    = new Date(startOfToday.getTime() - 365 * 24 * 60 * 60 * 1000);
 
-    const weekStart  = new Date(startOfToday.getTime() - 7   * 24 * 60 * 60 * 1000);
-    const monthStart = new Date(startOfToday.getTime() - 30  * 24 * 60 * 60 * 1000);
-    const yearStart  = new Date(startOfToday.getTime() - 365 * 24 * 60 * 60 * 1000);
-
-    // ── Sales revenue ────────────────────────────────────────────────────
-    const totalSalesResult = await prisma.sale.aggregate({ _sum: { totalAmount: true } });
+    // ── Sales revenue ─────────────────────────────────────────────────
+    const [totalSalesResult, salesTodayResult, totalSalesToday] = await Promise.all([
+      prisma.sale.aggregate({ _sum: { totalAmount: true } }),
+      prisma.sale.aggregate({
+        where: { createdAt: { gte: startOfToday, lt: endOfToday } },
+        _sum: { totalAmount: true },
+      }),
+      prisma.sale.count({
+        where: { createdAt: { gte: startOfToday, lt: endOfToday } },
+      }),
+    ]);
     const totalSalesRevenue = totalSalesResult._sum.totalAmount ?? 0;
-
-    const totalSalesToday = await prisma.sale.count({
-      where: { createdAt: { gte: startOfToday, lt: endOfToday } },
-    });
-
-    const salesTodayResult = await prisma.sale.aggregate({
-      where: { createdAt: { gte: startOfToday, lt: endOfToday } },
-      _sum: { totalAmount: true },
-    });
     const salesTodayRevenue = salesTodayResult._sum.totalAmount ?? 0;
 
-    // ── Returns ──────────────────────────────────────────────────────────
-    const totalReturnsResult = await prisma.return.aggregate({ _sum: { totalAmount: true } });
-    const totalReturnsAmount = totalReturnsResult._sum.totalAmount ?? 0;
-    const totalReturnsCount = await prisma.return.count();
+    // ── Returns ───────────────────────────────────────────────────────
+    const [totalReturnsResult, returnsTodayResult, totalReturnsCount, returnsTodayCount] =
+      await Promise.all([
+        prisma.return.aggregate({ _sum: { totalAmount: true } }),
+        prisma.return.aggregate({
+          where: { createdAt: { gte: startOfToday, lt: endOfToday } },
+          _sum: { totalAmount: true },
+        }),
+        prisma.return.count(),
+        prisma.return.count({
+          where: { createdAt: { gte: startOfToday, lt: endOfToday } },
+        }),
+      ]);
+    const totalReturnsAmount  = totalReturnsResult._sum.totalAmount  ?? 0;
+    const returnsTodayAmount  = returnsTodayResult._sum.totalAmount  ?? 0;
 
-    const returnsTodayResult = await prisma.return.aggregate({
-      where: { createdAt: { gte: startOfToday, lt: endOfToday } },
-      _sum: { totalAmount: true },
-    });
-    const returnsTodayAmount = returnsTodayResult._sum.totalAmount ?? 0;
-    const returnsTodayCount = await prisma.return.count({
-      where: { createdAt: { gte: startOfToday, lt: endOfToday } },
-    });
-
-    // ── Net revenue ──────────────────────────────────────────────────────
     const totalRevenue = totalSalesRevenue - totalReturnsAmount;
     const revenueToday = salesTodayRevenue - returnsTodayAmount;
 
-    // ── Low stock ─────────────────────────────────────────────────────────
+    // ── Low stock ─────────────────────────────────────────────────────
     const allProducts = await prisma.product.findMany({
       include: { category: true },
     });
     const lowStockProducts = allProducts.filter((p) => p.stock <= p.lowStockAlert);
 
-    // ── Expiring products ─────────────────────────────────────────────────
+    // ── Expiring products ─────────────────────────────────────────────
     const expiringProducts = await prisma.product.findMany({
-      where: { expiryDate: { not: null, gte: startOfToday, lte: in90Days } },
+      where: {
+        expiryDate: { not: null, gte: startOfToday, lte: in90Days },
+      },
       select: {
         id: true, name: true, expiryDate: true, stock: true,
         category: { select: { name: true } },
@@ -102,7 +105,7 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       orderBy: { expiryDate: "asc" },
     });
 
-    // ── Top 5 products ────────────────────────────────────────────────────
+    // ── Top 5 products ────────────────────────────────────────────────
     const topProductsRaw = await prisma.saleItem.groupBy({
       by: ["productId"],
       _sum: { quantity: true },
@@ -120,13 +123,12 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       })
     );
 
-    // ── Revenue last 7 days (net) ─────────────────────────────────────────
+    // ── Revenue last 7 days (net) ─────────────────────────────────────
     const revenueLastDays: { date: string; revenue: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-      const [salesDay, returnsDay] = await Promise.all([
+      const dayEnd   = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+      const [s, r] = await Promise.all([
         prisma.sale.aggregate({
           where: { createdAt: { gte: dayStart, lt: dayEnd } },
           _sum: { totalAmount: true },
@@ -136,14 +138,13 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
           _sum: { totalAmount: true },
         }),
       ]);
-
       revenueLastDays.push({
         date: dayStart.toISOString().split("T")[0],
-        revenue: (salesDay._sum.totalAmount ?? 0) - (returnsDay._sum.totalAmount ?? 0),
+        revenue: (s._sum.totalAmount ?? 0) - (r._sum.totalAmount ?? 0),
       });
     }
 
-    // ── P&L ───────────────────────────────────────────────────────────────
+    // ── P&L ───────────────────────────────────────────────────────────
     const [weekly, monthly, yearly] = await Promise.all([
       calcPnL(weekStart),
       calcPnL(monthStart),
@@ -166,7 +167,7 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
     });
   } catch (error) {
     console.error("Dashboard error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ error: String(error) });
   }
 });
 
