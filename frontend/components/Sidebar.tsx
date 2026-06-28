@@ -150,6 +150,8 @@ export default function Sidebar() {
 
   useEffect(() => {
     setUser(getUser());
+    // Silently wake up Render server on every app load
+    fetch("https://edo-cosmo.onrender.com/health").catch(() => {});
     fetchShop();
     window.addEventListener("shopSettingsUpdated", fetchShop);
     return () => window.removeEventListener("shopSettingsUpdated", fetchShop);

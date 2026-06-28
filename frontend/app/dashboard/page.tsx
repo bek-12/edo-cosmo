@@ -53,10 +53,22 @@ function StatCard({ title, value, icon: Icon, color, subtitle, subtitleRed }: {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [pnlPeriod, setPnlPeriod] = useState<"weekly" | "monthly" | "yearly">("weekly");
 
+  const fetchData = () => {
+    setLoading(true);
+    setError(false);
+    api.get("/api/dashboard")
+      .then((res) => setData(res.data))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
-    api.get("/api/dashboard").then((res) => setData(res.data)).catch(console.error).finally(() => setLoading(false));
+    // Silently wake up Render server
+    fetch("https://edo-cosmo.onrender.com/health").catch(() => {});
+    fetchData();
   }, []);
 
   const fmt = (n: number) =>
@@ -83,7 +95,37 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>
+          /* ── Skeleton ── */
+          <div className="animate-pulse space-y-4">
+            {/* Stat cards skeleton */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="bg-gray-200 rounded-xl h-24 sm:h-28" />
+              ))}
+            </div>
+            {/* Chart skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+              <div className="lg:col-span-2 bg-gray-200 rounded-xl h-64" />
+              <div className="bg-gray-200 rounded-xl h-64" />
+            </div>
+            {/* Table skeleton */}
+            <div className="bg-gray-200 rounded-xl h-40" />
+          </div>
+        ) : error ? (
+          /* ── Error state ── */
+          <div className="flex flex-col items-center justify-center h-64 gap-4 text-center px-4">
+            <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-rose-500" />
+            </div>
+            <div>
+              <p className="text-gray-700 font-semibold text-sm">Could not load dashboard</p>
+              <p className="text-gray-400 text-xs mt-1">The server may be waking up. Please wait 30 seconds and try again.</p>
+            </div>
+            <button onClick={fetchData}
+              className="px-5 py-2 bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium rounded-lg transition-colors">
+              Retry
+            </button>
+          </div>
         ) : data ? (
           <>
             {/* Stat cards — 4 regular + 1 P&L compact card */}
@@ -262,9 +304,7 @@ export default function DashboardPage() {
               </div>
             )}
           </>
-        ) : (
-          <p className="text-gray-400">Failed to load data.</p>
-        )}
+        ) : null}
       </div>
     </Layout>
   );
