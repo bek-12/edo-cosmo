@@ -25,7 +25,7 @@ async function calcPnL(start: Date): Promise<PnLPeriod> {
     prisma.stockPurchase.aggregate({
       where: { createdAt: { gte: start } },
       _sum: { totalCost: true },
-    }),
+    }).catch(() => ({ _sum: { totalCost: 0 } })),
   ]);
 
   const totalEarned =
