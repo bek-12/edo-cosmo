@@ -215,6 +215,8 @@ export default function ProfilePage() {
       });
       setUserProfile(res.data.user);
       setPersonalAlert({ type: "success", msg: "Profile updated successfully!" });
+      // Notify Sidebar to refresh avatar
+      window.dispatchEvent(new Event("profileUpdated"));
     } catch (err) {
       const msg = axios.isAxiosError(err)
         ? err.response?.data?.message || "Failed to update profile"

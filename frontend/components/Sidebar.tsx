@@ -12,7 +12,6 @@ import {
   Settings,
   Menu,
   X,
-  User,
   RotateCcw,
   PackagePlus,
 } from "lucide-react";
@@ -139,6 +138,9 @@ export default function Sidebar() {
   const [user, setUser] = useState<DecodedUser | null>(null);
   const [shop, setShop] = useState<ShopSettings>({ shopName: "GlowShop", shopLogo: null });
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(
+    typeof window !== "undefined" ? localStorage.getItem("userProfileImage") : null
+  );
 
   const fetchShop = () => {
     api
@@ -146,6 +148,11 @@ export default function Sidebar() {
       .then((res) => {
         const ss = res.data.shopSettings;
         if (ss) setShop({ shopName: ss.shopName ?? "GlowShop", shopLogo: ss.shopLogo ?? null });
+        // Cache and set profile image
+        const img = res.data.user?.profileImage ?? null;
+        setProfileImage(img);
+        if (img) localStorage.setItem("userProfileImage", img);
+        else localStorage.removeItem("userProfileImage");
       })
       .catch(() => {});
   };
@@ -156,7 +163,11 @@ export default function Sidebar() {
     fetch("https://edo-cosmo.onrender.com/health").catch(() => {});
     fetchShop();
     window.addEventListener("shopSettingsUpdated", fetchShop);
-    return () => window.removeEventListener("shopSettingsUpdated", fetchShop);
+    window.addEventListener("profileUpdated", fetchShop);
+    return () => {
+      window.removeEventListener("shopSettingsUpdated", fetchShop);
+      window.removeEventListener("profileUpdated", fetchShop);
+    };
   }, []);
 
   // Close drawer on route change
@@ -225,17 +236,23 @@ export default function Sidebar() {
         {/* Right: profile avatar */}
         <Link
           href="/profile"
-          className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 font-bold text-xs flex-shrink-0"
+          className="w-9 h-9 rounded-full flex-shrink-0 overflow-hidden ring-2 ring-rose-200 flex items-center justify-center"
           aria-label="Profile"
         >
-        {user?.profileImage ? (
+          {profileImage ? (
             <img
-              src={user.profileImage}
+              src={profileImage}
               alt="profile"
-              className="w-full h-full rounded-full object-cover"
+              className="w-full h-full object-cover"
             />
           ) : (
-            <User className="w-4 h-4 text-rose-500" />
+            <div className="w-full h-full bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center">
+              <span className="text-white text-xs font-medium">
+                {user?.name
+                  ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
+                  : "?"}
+              </span>
+            </div>
           )}
         </Link>
       </header>
