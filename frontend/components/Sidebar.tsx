@@ -236,24 +236,26 @@ export default function Sidebar() {
         {/* Right: profile avatar */}
         <Link
           href="/profile"
-          className="w-9 h-9 rounded-full flex-shrink-0 overflow-hidden ring-2 ring-rose-200 flex items-center justify-center"
+          className="flex-shrink-0"
           aria-label="Profile"
         >
-          {profileImage ? (
-            <img
-              src={profileImage}
-              alt="profile"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center">
-              <span className="text-white text-xs font-medium">
-                {user?.name
-                  ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
-                  : "?"}
-              </span>
-            </div>
-          )}
+          <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-rose-200">
+            {profileImage ? (
+              <img
+                src={profileImage}
+                alt="profile"
+                className="w-9 h-9 rounded-full object-cover object-center ring-2 ring-rose-200 flex-shrink-0"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center">
+                <span className="text-white text-xs font-medium">
+                  {user?.name
+                    ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
+                    : "?"}
+                </span>
+              </div>
+            )}
+          </div>
         </Link>
       </header>
 
