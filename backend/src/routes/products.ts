@@ -93,11 +93,20 @@ router.delete("/:id", authenticate, requireAdmin, async (req: AuthRequest, res: 
       res.status(404).json({ message: "Product not found" });
       return;
     }
-    await prisma.product.delete({ where: { id } });
+
+    // Delete all child records first (foreign key constraints)
+    await prisma.$transaction([
+      prisma.stockPurchase.deleteMany({ where: { productId: id } }),
+      prisma.returnItem.deleteMany({ where: { productId: id } }),
+      prisma.saleItem.deleteMany({ where: { productId: id } }),
+      prisma.product.delete({ where: { id } }),
+    ]);
+
     res.json({ message: "Product deleted successfully" });
   } catch (error) {
     console.error("Delete product error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    const msg = error instanceof Error ? error.message : "Internal server error";
+    res.status(500).json({ message: msg });
   }
 });
 
