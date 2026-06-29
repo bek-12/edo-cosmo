@@ -14,6 +14,7 @@ interface PnLPeriod {
 
 async function calcPnL(start: Date): Promise<PnLPeriod> {
   const [salesAgg, returnsAgg, spendAgg] = await Promise.all([
+    // Money received: sales - returns
     prisma.sale.aggregate({
       where: { createdAt: { gte: start } },
       _sum: { totalAmount: true },
@@ -22,6 +23,7 @@ async function calcPnL(start: Date): Promise<PnLPeriod> {
       where: { createdAt: { gte: start } },
       _sum: { totalAmount: true },
     }),
+    // Money spent via Restock button
     prisma.stockPurchase.aggregate({
       where: { createdAt: { gte: start } },
       _sum: { totalCost: true },
@@ -30,7 +32,19 @@ async function calcPnL(start: Date): Promise<PnLPeriod> {
 
   const totalEarned =
     (salesAgg._sum.totalAmount ?? 0) - (returnsAgg._sum.totalAmount ?? 0);
-  const totalSpent = spendAgg._sum.totalCost ?? 0;
+
+  // Also count initial stock cost for products CREATED in this period
+  // (products added before the restock system existed)
+  const newProducts = await prisma.product.findMany({
+    where: { createdAt: { gte: start } },
+    select: { buyingPrice: true, stock: true },
+  });
+  const initialStockCost = newProducts.reduce(
+    (sum, p) => sum + p.buyingPrice * p.stock,
+    0
+  );
+
+  const totalSpent = (spendAgg._sum.totalCost ?? 0) + initialStockCost;
   const netProfit  = totalEarned - totalSpent;
 
   return { totalEarned, totalSpent, netProfit, isLoss: netProfit < 0 };
