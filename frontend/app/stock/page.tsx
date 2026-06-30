@@ -169,18 +169,30 @@ export default function StockPage() {
               <PackagePlus className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500">Total Invested</p>
-              <p className="text-xl font-bold text-indigo-600">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Total Invested</p>
+              <p className="text-2xl font-bold text-indigo-600 mt-0.5">
                 {statsLoading ? "—" : fmt(stats?.totalInvested ?? 0)}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {statsLoading ? "" : (
+                  <>
+                    <span className="font-semibold text-gray-600">
+                      {stats?.topRestocked.reduce((s, i) => s + i.totalQty, 0) ?? 0}
+                    </span> total items restocked
+                  </>
+                )}
               </p>
             </div>
           </div>
 
           {/* Most Restocked Items */}
           <div className="bg-white border border-gray-100 rounded-xl px-5 py-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="w-4 h-4 text-rose-500" />
-              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Most Restocked Items</p>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-rose-500" />
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Most Restocked</p>
+              </div>
+              <span className="text-xs text-gray-400">Top 5</span>
             </div>
             {statsLoading ? (
               <div className="text-sm text-gray-400">Loading...</div>
@@ -189,24 +201,22 @@ export default function StockPage() {
             ) : (
               <div className="space-y-2">
                 {stats.topRestocked.map((item, i) => {
-                  const maxQty = stats.topRestocked[0].totalQty;
-                  const pct    = maxQty > 0 ? Math.round((item.totalQty / maxQty) * 100) : 0;
+                  const medals = ["🥇", "🥈", "🥉"];
                   return (
-                    <div key={item.productId} className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <p className="text-xs font-semibold text-gray-700 truncate">{item.productName}</p>
-                          <p className="text-xs text-gray-500 ml-2 flex-shrink-0">{item.totalQty} units</p>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-1.5">
-                          <div
-                            className="bg-rose-400 h-1.5 rounded-full transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
+                    <div key={item.productId} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-base w-5 flex-shrink-0">{medals[i] ?? `${i + 1}`}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{item.productName}</p>
+                          <p className="text-xs text-gray-400">{item.category}</p>
                         </div>
                       </div>
-                      <span className="text-xs text-gray-400 flex-shrink-0">{item.restockCount}×</span>
+                      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                        <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                          +{item.totalQty} units
+                        </span>
+                        <span className="text-xs text-gray-400">{item.restockCount}×</span>
+                      </div>
                     </div>
                   );
                 })}
