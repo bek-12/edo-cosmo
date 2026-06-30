@@ -172,7 +172,7 @@ async function exportPDF(summary: SummaryData) {
   });
 
   // ── Footer ────────────────────────────────────────────────────────────────
-  const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+  const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...GRAY);
