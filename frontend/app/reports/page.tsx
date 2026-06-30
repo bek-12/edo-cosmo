@@ -69,88 +69,117 @@ function fmtBirr(n: number) {
     .format(n).replace("ETB", "Birr");
 }
 
-function exportPDF(summary: SummaryData) {
+async function exportPDF(summary: SummaryData) {
+  // Dynamic import so Next.js doesn't SSR these browser-only modules
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const periodLabel = summary.period.charAt(0).toUpperCase() + summary.period.slice(1);
   const now = new Date().toLocaleString("en-US", {
-    month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit",
+    month: "long", day: "numeric", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
   });
 
-  const topRows = summary.topProducts.map((p, i) => `
-    <tr>
-      <td>${i + 1}</td>
-      <td>${p.productName}</td>
-      <td>${p.unitsSold}</td>
-      <td>${fmtBirr(p.revenue)}</td>
-    </tr>`).join("");
+  const ROSE   = [225, 29,  72]  as [number, number, number];
+  const GREEN  = [5,   150, 105] as [number, number, number];
+  const RED    = [220, 38,  38]  as [number, number, number];
+  const DARK   = [17,  24,  39]  as [number, number, number];
+  const GRAY   = [107, 114, 128] as [number, number, number];
+  const LIGHT  = [249, 250, 251] as [number, number, number];
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <title>${periodLabel} Report</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111; padding: 32px; }
-        h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-        .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
-        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
-        .kpi { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; }
-        .kpi-label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
-        .kpi-value { font-size: 18px; font-weight: 700; margin-top: 4px; }
-        .profit { color: #059669; } .loss { color: #dc2626; }
-        h2 { font-size: 14px; font-weight: 600; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #374151; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th { text-align: left; padding: 8px 10px; background: #f3f4f6; border-bottom: 2px solid #e5e7eb; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
-        td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
-        tr:last-child td { border-bottom: none; }
-        .footer { margin-top: 32px; font-size: 11px; color: #9ca3af; text-align: center; }
-        @media print { body { padding: 16px; } }
-      </style>
-    </head>
-    <body>
-      <h1>${periodLabel} Report</h1>
-      <p class="meta">Generated on ${now}</p>
+  let y = 18;
 
-      <div class="kpi-grid">
-        <div class="kpi">
-          <div class="kpi-label">Total Sales</div>
-          <div class="kpi-value">${summary.totalSales}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Revenue</div>
-          <div class="kpi-value">${fmtBirr(summary.totalRevenue)}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Total Spent</div>
-          <div class="kpi-value">${fmtBirr(summary.totalSpent)}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Net ${summary.isLoss ? "Loss" : "Profit"}</div>
-          <div class="kpi-value ${summary.isLoss ? "loss" : "profit"}">
-            ${summary.isLoss ? "−" : "+"}${fmtBirr(Math.abs(summary.netProfit))}
-          </div>
-        </div>
-      </div>
+  // ── Header ───────────────────────────────────────────────────────────────
+  doc.setFillColor(...ROSE);
+  doc.rect(0, 0, 210, 14, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text("Cosmetics Shop — Sales Report", 14, 9.5);
 
-      <h2>Top Products</h2>
-      <table>
-        <thead>
-          <tr><th>#</th><th>Product</th><th>Units Sold</th><th>Revenue</th></tr>
-        </thead>
-        <tbody>${topRows}</tbody>
-      </table>
+  doc.setTextColor(...DARK);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(`${periodLabel} Summary`, 14, y + 6);
+  y += 8;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...GRAY);
+  doc.text(`Generated: ${now}`, 14, y + 4);
+  y += 12;
 
-      <p class="footer">Return Rate: ${summary.returnRate}% &nbsp;·&nbsp; Cosmetics Shop — Sales &amp; Inventory System</p>
-    </body>
-    </html>`;
+  // ── KPI boxes ────────────────────────────────────────────────────────────
+  const kpis = [
+    { label: "Total Sales",  value: `${summary.totalSales} txns`,           color: DARK },
+    { label: "Revenue",      value: fmtBirr(summary.totalRevenue),           color: DARK },
+    { label: "Total Spent",  value: fmtBirr(summary.totalSpent),             color: DARK },
+    {
+      label: summary.isLoss ? "Net Loss" : "Net Profit",
+      value: `${summary.isLoss ? "−" : "+"}${fmtBirr(Math.abs(summary.netProfit))}`,
+      color: summary.isLoss ? RED : GREEN,
+    },
+  ];
 
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  setTimeout(() => { win.print(); }, 400);
+  const boxW = 43, boxH = 18, gap = 3, startX = 14;
+  kpis.forEach((kpi, i) => {
+    const x = startX + i * (boxW + gap);
+    doc.setFillColor(...LIGHT);
+    doc.roundedRect(x, y, boxW, boxH, 2, 2, "F");
+    doc.setDrawColor(229, 231, 235);
+    doc.roundedRect(x, y, boxW, boxH, 2, 2, "S");
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...GRAY);
+    doc.text(kpi.label.toUpperCase(), x + 3, y + 5);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...kpi.color);
+    doc.text(kpi.value, x + 3, y + 13);
+  });
+  y += boxH + 10;
+
+  // ── Top Products table ────────────────────────────────────────────────────
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...DARK);
+  doc.text("Top Products", 14, y);
+  y += 4;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["#", "Product", "Units Sold", "Revenue"]],
+    body: summary.topProducts.map((p, i) => [
+      i + 1,
+      p.productName,
+      p.unitsSold,
+      fmtBirr(p.revenue),
+    ]),
+    headStyles: {
+      fillColor: ROSE,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      fontSize: 9,
+    },
+    bodyStyles: { fontSize: 9, textColor: DARK },
+    alternateRowStyles: { fillColor: LIGHT },
+    columnStyles: {
+      0: { cellWidth: 10, halign: "center" },
+      2: { halign: "right" },
+      3: { halign: "right", textColor: [225, 29, 72], fontStyle: "bold" },
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...GRAY);
+  doc.text(`Return Rate: ${summary.returnRate}%   ·   Cosmetics Shop Sales & Inventory System`, 14, finalY);
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+  doc.save(`report-${summary.period}-${new Date().toISOString().split("T")[0]}.pdf`);
 }
 
 /* ── Summary Section Component ── */
