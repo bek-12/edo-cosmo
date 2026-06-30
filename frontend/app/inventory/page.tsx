@@ -94,6 +94,7 @@ export default function InventoryPage() {
   const [restockProduct, setRestockProduct] = useState<Product | null>(null);
   const [restockQty, setRestockQty] = useState("");
   const [restockPrice, setRestockPrice] = useState("");
+  const [restockSellingPrice, setRestockSellingPrice] = useState("");
   const [restockNote, setRestockNote] = useState("");
   const [restockSaving, setRestockSaving] = useState(false);
   const [restockSuccess, setRestockSuccess] = useState("");
@@ -191,6 +192,7 @@ export default function InventoryPage() {
     setRestockProduct(p);
     setRestockQty("");
     setRestockPrice(String(p.buyingPrice));
+    setRestockSellingPrice(String(p.sellingPrice));
     setRestockNote("");
     setRestockSuccess("");
   };
@@ -199,6 +201,7 @@ export default function InventoryPage() {
     if (!restockProduct) return;
     const qty = Number(restockQty);
     const bp  = Number(restockPrice);
+    const sp  = Number(restockSellingPrice);
     if (!qty || qty < 1 || !bp || bp < 0) return;
     setRestockSaving(true);
     try {
@@ -206,6 +209,7 @@ export default function InventoryPage() {
         productId: restockProduct.id,
         quantity: qty,
         buyingPrice: bp,
+        sellingPrice: sp || undefined,
         note: restockNote || null,
       });
       const totalCost = qty * bp;
@@ -559,6 +563,13 @@ export default function InventoryPage() {
                   <input type="number" value={restockPrice} onChange={(e) => setRestockPrice(e.target.value)}
                     min="0"
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price per Unit</label>
+                  <input type="number" value={restockSellingPrice} onChange={(e) => setRestockSellingPrice(e.target.value)}
+                    min="0"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  <p className="text-xs text-gray-400 mt-1">Updates the product&apos;s selling price going forward</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Note <span className="text-gray-400 font-normal">(optional)</span></label>

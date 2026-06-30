@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 
 // POST /api/stock/restock
 router.post("/restock", authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { productId, quantity, buyingPrice, note } = req.body;
+  const { productId, quantity, buyingPrice, sellingPrice, note } = req.body;
 
   if (!productId || quantity == null || buyingPrice == null) {
     res.status(400).json({ message: "productId, quantity, and buyingPrice are required" });
@@ -30,6 +30,8 @@ router.post("/restock", authenticate, async (req: AuthRequest, res: Response): P
       return;
     }
 
+    const sp = sellingPrice != null ? Number(sellingPrice) : null;
+
     const [purchase, updatedProduct] = await prisma.$transaction([
       prisma.stockPurchase.create({
         data: {
@@ -50,6 +52,7 @@ router.post("/restock", authenticate, async (req: AuthRequest, res: Response): P
         data: {
           stock: { increment: qty },
           buyingPrice: bp,
+          ...(sp != null && sp > 0 ? { sellingPrice: sp } : {}),
         },
         include: { category: true },
       }),
