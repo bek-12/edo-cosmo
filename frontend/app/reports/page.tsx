@@ -64,6 +64,183 @@ function exportCSV(summary: SummaryData) {
   URL.revokeObjectURL(url);
 }
 
+function exportPDF(summary: SummaryData) {
+  const fmtN = (n: number) =>
+    new Intl.NumberFormat("en-ET", { style: "currency", currency: "ETB", maximumFractionDigits: 0 })
+      .format(n).replace("ETB", "Birr");
+
+  const topRows = summary.topProducts
+    .map((p, i) => `
+      <tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0">${i + 1}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;font-weight:500">${p.productName}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:right">${p.unitsSold}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0f0f0;text-align:right;color:#e11d48;font-weight:600">${fmtN(p.revenue)}</td>
+      </tr>`)
+    .join("");
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8"/>
+      <title>Report — ${summary.period}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { padding: 32px; color: #1f2937; background: #fff; }
+        h1 { font-size: 22px; font-weight: 700; color: #e11d48; margin-bottom: 4px; }
+        .subtitle { font-size: 12px; color: #6b7280; margin-bottom: 24px; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+        .card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; }
+        .card-label { font-size: 11px; color: #6b7280; margin-bottom: 4px; }
+        .card-value { font-size: 16px; font-weight: 700; color: #111827; }
+        .card-value.green { color: #059669; }
+        .card-value.red { color: #dc2626; }
+        h2 { font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        thead th { background: #f3f4f6; padding: 8px 10px; text-align: left; font-weight: 600; color: #6b7280; }
+        thead th:last-child, thead th:nth-child(3) { text-align: right; }
+        .footer { margin-top: 32px; font-size: 11px; color: #9ca3af; text-align: center; }
+        @media print { body { padding: 16px; } }
+      </style>
+    </head>
+    <body>
+      <h1>Summary Report</h1>
+      <p class="subtitle">Period: ${summary.period.charAt(0).toUpperCase() + summary.period.slice(1)} &nbsp;|&nbsp; Generated: ${new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}</p>
+
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Total Sales</div>
+          <div class="card-value">${summary.totalSales} transactions</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Revenue</div>
+          <div class="card-value">${fmtN(summary.totalRevenue)}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Spent</div>
+          <div class="card-value">${fmtN(summary.totalSpent)}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">${summary.isLoss ? "Net Loss" : "Net Profit"}</div>
+          <div class="card-value ${summary.isLoss ? "red" : "green"}">${summary.isLoss ? "−" : "+"}${fmtN(Math.abs(summary.netProfit))}</div>
+        </div>
+      </div>
+
+      <h2>Top Products</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Product</th>
+            <th style="text-align:right">Units Sold</th>
+            <th style="text-align:right">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>${topRows}</tbody>
+      </table>
+
+      <div class="footer">Return Rate: ${summary.returnRate}% &nbsp;|&nbsp; Cosmetics Shop — Sales &amp; Inventory System</div>
+    </body>
+    </html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 400);
+}
+
+function fmtBirr(n: number) {
+  return new Intl.NumberFormat("en-ET", { style: "currency", currency: "ETB", maximumFractionDigits: 0 })
+    .format(n).replace("ETB", "Birr");
+}
+
+function exportPDF(summary: SummaryData) {
+  const periodLabel = summary.period.charAt(0).toUpperCase() + summary.period.slice(1);
+  const now = new Date().toLocaleString("en-US", {
+    month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+
+  const topRows = summary.topProducts.map((p, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${p.productName}</td>
+      <td>${p.unitsSold}</td>
+      <td>${fmtBirr(p.revenue)}</td>
+    </tr>`).join("");
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>${periodLabel} Report</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111; padding: 32px; }
+        h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+        .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+        .kpi { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; }
+        .kpi-label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+        .kpi-value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+        .profit { color: #059669; } .loss { color: #dc2626; }
+        h2 { font-size: 14px; font-weight: 600; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #374151; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 8px 10px; background: #f3f4f6; border-bottom: 2px solid #e5e7eb; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
+        tr:last-child td { border-bottom: none; }
+        .footer { margin-top: 32px; font-size: 11px; color: #9ca3af; text-align: center; }
+        @media print { body { padding: 16px; } }
+      </style>
+    </head>
+    <body>
+      <h1>${periodLabel} Report</h1>
+      <p class="meta">Generated on ${now}</p>
+
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">Total Sales</div>
+          <div class="kpi-value">${summary.totalSales}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Revenue</div>
+          <div class="kpi-value">${fmtBirr(summary.totalRevenue)}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Total Spent</div>
+          <div class="kpi-value">${fmtBirr(summary.totalSpent)}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Net ${summary.isLoss ? "Loss" : "Profit"}</div>
+          <div class="kpi-value ${summary.isLoss ? "loss" : "profit"}">
+            ${summary.isLoss ? "−" : "+"}${fmtBirr(Math.abs(summary.netProfit))}
+          </div>
+        </div>
+      </div>
+
+      <h2>Top Products</h2>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Product</th><th>Units Sold</th><th>Revenue</th></tr>
+        </thead>
+        <tbody>${topRows}</tbody>
+      </table>
+
+      <p class="footer">Return Rate: ${summary.returnRate}% &nbsp;·&nbsp; Cosmetics Shop — Sales &amp; Inventory System</p>
+    </body>
+    </html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 400);
+}
+
 /* ── Summary Section Component ── */
 function SummarySection() {
   const [period, setPeriod] = useState<"weekly" | "monthly" | "yearly">("weekly");
@@ -175,10 +352,16 @@ function SummarySection() {
             </div>
 
             {/* Export */}
-            <button onClick={() => exportCSV(summary)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
-              <Download className="w-4 h-4" />Export CSV
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => exportCSV(summary)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+                <Download className="w-4 h-4" />Export CSV
+              </button>
+              <button onClick={() => exportPDF(summary)}
+                className="flex items-center gap-2 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-sm font-medium transition-colors border border-rose-200">
+                <Download className="w-4 h-4" />Export PDF
+              </button>
+            </div>
           </>
         ) : null}
       </div>
