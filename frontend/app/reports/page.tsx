@@ -189,7 +189,7 @@ async function exportPDF(summary: SummaryData) {
 }
 
 /* ── Summary Section Component ── */
-function SummarySection() {
+function SummarySection({ onSummaryReady }: { onSummaryReady: (s: SummaryData | null) => void }) {
   const [period, setPeriod] = useState<"weekly" | "monthly" | "yearly">("weekly");
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -197,10 +197,10 @@ function SummarySection() {
   const fetchSummary = useCallback(() => {
     setLoading(true);
     api.get(`/api/reports/summary?period=${period}`)
-      .then((r) => setSummary(r.data))
+      .then((r) => { setSummary(r.data); onSummaryReady(r.data); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [period]);
+  }, [period, onSummaryReady]);
 
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
@@ -212,7 +212,7 @@ function SummarySection() {
 
   return (
     <div className="mb-6 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Header row: title + toggles + export buttons */}
+      {/* Header row: title + toggles only */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 pt-4 border-b border-gray-100 pb-3">
         <h2 className="text-sm sm:text-base font-semibold text-gray-800">Summary Report</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -224,19 +224,6 @@ function SummarySection() {
               {t.label}
             </button>
           ))}
-          <div className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
-          {summary && (
-            <>
-              <button onClick={() => exportCSV(summary)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors">
-                <Download className="w-3.5 h-3.5" />CSV
-              </button>
-              <button onClick={() => exportPDF(summary)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold transition-colors border border-rose-200">
-                <Download className="w-3.5 h-3.5" />PDF
-              </button>
-            </>
-          )}
         </div>
       </div>
 
@@ -323,6 +310,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [currentSummary, setCurrentSummary] = useState<SummaryData | null>(null);
   const [returnSale, setReturnSale] = useState<Sale | null>(null);
   const [eligibility, setEligibility] = useState<{ eligible: boolean; hoursSinceSale: number } | null>(null);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
@@ -401,13 +389,27 @@ export default function ReportsPage() {
   return (
     <Layout>
       <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-        <div className="mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-3xl font-bold text-gray-800">Sales Reports</h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">View, filter and process returns</p>
+        <div className="flex items-start justify-between mb-4 sm:mb-6">
+          <div>
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-800">Sales Reports</h1>
+            <p className="text-gray-500 text-xs sm:text-sm mt-0.5">View, filter and process returns</p>
+          </div>
+          {currentSummary && (
+            <div className="flex items-center gap-2 mt-1">
+              <button onClick={() => exportCSV(currentSummary)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+                <Download className="w-4 h-4" />CSV
+              </button>
+              <button onClick={() => exportPDF(currentSummary)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-sm font-medium transition-colors border border-rose-200">
+                <Download className="w-4 h-4" />PDF
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Summary section at top */}
-        <SummarySection />
+        <SummarySection onSummaryReady={setCurrentSummary} />
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 sm:gap-4 mb-5">
