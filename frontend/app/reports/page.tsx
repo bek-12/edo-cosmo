@@ -111,7 +111,7 @@ async function exportPDF(summary: SummaryData) {
 
   // ── KPI boxes ────────────────────────────────────────────────────────────
   const kpis = [
-    { label: "Total Sales",  value: `${summary.totalSales} txns`,           color: DARK },
+    { label: "Total Sales",  value: String(summary.totalSales),               color: DARK },
     { label: "Revenue",      value: fmtBirr(summary.totalRevenue),           color: DARK },
     { label: "Total Spent",  value: fmtBirr(summary.totalSpent),             color: DARK },
     {
@@ -169,8 +169,8 @@ async function exportPDF(summary: SummaryData) {
     },
     tableWidth: 182,
     columnStyles: {
-      0: { cellWidth: 15, halign: "center" },
-      1: { cellWidth: 97, halign: "left" },
+      0: { cellWidth: 20, halign: "center" },
+      1: { cellWidth: 92, halign: "left" },
       2: { cellWidth: 30, halign: "right" },
       3: { cellWidth: 40, halign: "right", textColor: [225, 29, 72] as [number, number, number], fontStyle: "bold" },
     },
