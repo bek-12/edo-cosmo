@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
-import { PackagePlus, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { PackagePlus, ChevronLeft, ChevronRight } from "lucide-react";
 
 /* ── Types ── */
 interface StockPurchase {
@@ -163,66 +163,49 @@ export default function StockPage() {
 
         {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          {/* Total Invested */}
-          <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-5 py-4 flex items-center gap-4">
-            <div className="bg-indigo-100 p-2.5 rounded-lg flex-shrink-0">
-              <PackagePlus className="w-5 h-5 text-indigo-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Total Invested</p>
-              <p className="text-2xl font-bold text-indigo-600 mt-0.5">
-                {statsLoading ? "—" : fmt(stats?.totalInvested ?? 0)}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                {statsLoading ? "" : (
-                  <>
-                    <span className="font-semibold text-gray-600">
-                      {stats?.topRestocked.reduce((s, i) => s + i.totalQty, 0) ?? 0}
-                    </span> total items restocked
-                  </>
-                )}
+
+          {/* Total Invested card */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 border-l-4 border-l-indigo-500">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3">Total Invested</p>
+            <p className="text-3xl font-bold text-gray-900">
+              {statsLoading ? "—" : fmt(stats?.totalInvested ?? 0)}
+            </p>
+            <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-1.5">
+              <PackagePlus className="w-3.5 h-3.5 text-indigo-400" />
+              <p className="text-xs text-gray-400">
+                <span className="font-semibold text-gray-600">
+                  {statsLoading ? "—" : (stats?.topRestocked.reduce((s, i) => s + i.totalQty, 0) ?? 0)}
+                </span>{" "}units restocked in total
               </p>
             </div>
           </div>
 
-          {/* Most Restocked Items */}
-          <div className="bg-white border border-gray-100 rounded-xl px-5 py-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-rose-500" />
-                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Most Restocked</p>
-              </div>
-              <span className="text-xs text-gray-400">Top 5</span>
+          {/* Most Restocked card */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-widest">Most Restocked</p>
+              <span className="text-xs text-gray-300 font-medium">QTY</span>
             </div>
             {statsLoading ? (
               <div className="text-sm text-gray-400">Loading...</div>
             ) : !stats?.topRestocked.length ? (
-              <div className="text-sm text-gray-400">No data yet</div>
+              <div className="text-sm text-gray-400">No restock records yet</div>
             ) : (
-              <div className="space-y-2">
-                {stats.topRestocked.map((item, i) => {
-                  const medals = ["🥇", "🥈", "🥉"];
-                  return (
-                    <div key={item.productId} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-base w-5 flex-shrink-0">{medals[i] ?? `${i + 1}`}</span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{item.productName}</p>
-                          <p className="text-xs text-gray-400">{item.category}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                        <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                          +{item.totalQty} units
-                        </span>
-                        <span className="text-xs text-gray-400">{item.restockCount}×</span>
-                      </div>
+              <ol className="space-y-3">
+                {stats.topRestocked.map((item, i) => (
+                  <li key={item.productId} className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-gray-300 w-4 flex-shrink-0 text-right">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate leading-tight">{item.productName}</p>
+                      <p className="text-xs text-gray-400 truncate">{item.category}</p>
                     </div>
-                  );
-                })}
-              </div>
+                    <span className="text-sm font-bold text-indigo-600 flex-shrink-0">{item.totalQty}</span>
+                  </li>
+                ))}
+              </ol>
             )}
           </div>
+
         </div>
 
         {/* Table */}
