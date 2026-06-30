@@ -150,23 +150,29 @@ async function exportPDF(summary: SummaryData) {
     startY: y,
     head: [["#", "Product", "Units Sold", "Revenue"]],
     body: summary.topProducts.map((p, i) => [
-      i + 1,
+      String(i + 1),
       p.productName,
-      p.unitsSold,
+      String(p.unitsSold),
       fmtBirr(p.revenue),
     ]),
+    theme: "striped",
+    styles: {
+      fontSize: 10,
+      cellPadding: 6,
+      overflow: "linebreak",
+    },
     headStyles: {
       fillColor: ROSE,
-      textColor: [255, 255, 255],
+      textColor: [255, 255, 255] as [number, number, number],
       fontStyle: "bold",
-      fontSize: 9,
+      halign: "left",
     },
-    bodyStyles: { fontSize: 9, textColor: DARK },
-    alternateRowStyles: { fillColor: LIGHT },
+    tableWidth: 182,
     columnStyles: {
-      0: { cellWidth: 10, halign: "center" },
-      2: { halign: "right" },
-      3: { halign: "right", textColor: [225, 29, 72], fontStyle: "bold" },
+      0: { cellWidth: 15, halign: "center" },
+      1: { cellWidth: 97, halign: "left" },
+      2: { cellWidth: 30, halign: "right" },
+      3: { cellWidth: 40, halign: "right", textColor: [225, 29, 72] as [number, number, number], fontStyle: "bold" },
     },
     margin: { left: 14, right: 14 },
   });
@@ -206,10 +212,10 @@ function SummarySection() {
 
   return (
     <div className="mb-6 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Tabs */}
-      <div className="flex items-center justify-between px-4 sm:px-5 pt-4 border-b border-gray-100 pb-0">
-        <h2 className="text-sm sm:text-base font-semibold text-gray-800 mb-3">Summary Report</h2>
-        <div className="flex gap-1 mb-3">
+      {/* Header row: title + toggles + export buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 pt-4 border-b border-gray-100 pb-3">
+        <h2 className="text-sm sm:text-base font-semibold text-gray-800">Summary Report</h2>
+        <div className="flex flex-wrap items-center gap-2">
           {tabs.map((t) => (
             <button key={t.key} onClick={() => setPeriod(t.key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -218,6 +224,19 @@ function SummarySection() {
               {t.label}
             </button>
           ))}
+          <div className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
+          {summary && (
+            <>
+              <button onClick={() => exportCSV(summary)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors">
+                <Download className="w-3.5 h-3.5" />CSV
+              </button>
+              <button onClick={() => exportPDF(summary)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-semibold transition-colors border border-rose-200">
+                <Download className="w-3.5 h-3.5" />PDF
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -264,7 +283,7 @@ function SummarySection() {
             </div>
 
             {/* Top products table */}
-            <div className="mb-4">
+            <div>
               <h3 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Top Products</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -290,18 +309,6 @@ function SummarySection() {
                   </tbody>
                 </table>
               </div>
-            </div>
-
-            {/* Export */}
-            <div className="flex gap-2">
-              <button onClick={() => exportCSV(summary)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
-                <Download className="w-4 h-4" />Export CSV
-              </button>
-              <button onClick={() => exportPDF(summary)}
-                className="flex items-center gap-2 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-sm font-medium transition-colors border border-rose-200">
-                <Download className="w-4 h-4" />Export PDF
-              </button>
             </div>
           </>
         ) : null}
