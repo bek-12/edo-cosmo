@@ -33,18 +33,7 @@ async function calcPnL(start: Date): Promise<PnLPeriod> {
   const totalEarned =
     (salesAgg._sum.totalAmount ?? 0) - (returnsAgg._sum.totalAmount ?? 0);
 
-  // Also count initial stock cost for products CREATED in this period
-  // (products added before the restock system existed)
-  const newProducts = await prisma.product.findMany({
-    where: { createdAt: { gte: start } },
-    select: { buyingPrice: true, stock: true },
-  });
-  const initialStockCost = newProducts.reduce(
-    (sum, p) => sum + p.buyingPrice * p.stock,
-    0
-  );
-
-  const totalSpent = (spendAgg._sum.totalCost ?? 0) + initialStockCost;
+  const totalSpent = spendAgg._sum.totalCost ?? 0;
   const netProfit  = totalEarned - totalSpent;
 
   return { totalEarned, totalSpent, netProfit, isLoss: netProfit < 0 };
