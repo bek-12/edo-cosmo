@@ -8,6 +8,8 @@ import {
 } from "recharts";
 import { DollarSign, Calendar, RotateCcw, X, AlertTriangle, CheckCircle, Download } from "lucide-react";
 import axios from "axios";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 /* ── Types ── */
 interface SaleItem {
@@ -100,8 +102,6 @@ function exportPurchaseCSV(report: PurchaseReport) {
 }
 
 async function exportPurchasePDF(report: PurchaseReport) {
-  const { default: jsPDF } = await import("jspdf");
-  const { default: autoTable } = await import("jspdf-autotable");
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const INDIGO = [79, 70, 229]   as [number, number, number];
   const DARK   = [17, 24, 39]    as [number, number, number];
@@ -158,7 +158,6 @@ async function exportPurchasePDF(report: PurchaseReport) {
 }
 
 async function exportPDF(summary: SummaryData) {
-
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const periodLabel = summary.period.charAt(0).toUpperCase() + summary.period.slice(1);
   const now = new Date().toLocaleString("en-US", {
