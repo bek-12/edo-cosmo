@@ -136,18 +136,22 @@ router.get("/stats", authenticate, async (_req: AuthRequest, res: Response): Pro
 // GET /api/stock/report?period=weekly|monthly|yearly
 router.get("/report", authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const period = (req.query.period as string) || "weekly";
+    const period = ((req.query.period as string) || "weekly").toLowerCase();
     const now    = new Date();
     let startDate: Date;
 
     if (period === "yearly") {
-      startDate = new Date(now.getFullYear(), 0, 1);
+      startDate = new Date(now);
+      startDate.setFullYear(now.getFullYear() - 1);
+      startDate.setHours(0, 0, 0, 0);
     } else if (period === "monthly") {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 30);
+      startDate.setHours(0, 0, 0, 0);
     } else {
       // weekly — last 7 days
       startDate = new Date(now);
-      startDate.setDate(now.getDate() - 6);
+      startDate.setDate(now.getDate() - 7);
       startDate.setHours(0, 0, 0, 0);
     }
 
@@ -158,7 +162,7 @@ router.get("/report", authenticate, async (req: AuthRequest, res: Response): Pro
       prisma.stockPurchase.aggregate({
         where,
         _sum: { totalCost: true, quantity: true },
-        _count: { id: true },
+        _count: { _all: true },
       }),
       prisma.stockPurchase.findMany({
         where,
@@ -223,7 +227,7 @@ router.get("/report", authenticate, async (req: AuthRequest, res: Response): Pro
     res.json({
       period,
       totalSpent: agg._sum.totalCost ?? 0,
-      totalPurchases: agg._count.id,
+      totalPurchases: agg._count._all,
       totalUnitsRestocked: agg._sum.quantity ?? 0,
       spendingByDay,
       topRestockedProducts,

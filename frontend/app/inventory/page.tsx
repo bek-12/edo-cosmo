@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
-import { Plus, Pencil, Trash2, X, AlertTriangle, Search, PackagePlus } from "lucide-react";
+import { Plus, Pencil, Trash2, X, AlertTriangle, Search, PackagePlus, ChevronLeft, ChevronRight } from "lucide-react";
 import axios from "axios";
 
 interface Category { id: string; name: string; }
@@ -69,6 +69,101 @@ function CategoryCombo({ categories, value, inputText, onChange }: {
             <p className="px-3 py-2 text-sm text-gray-400">No categories found</p>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Horizontally scrollable pills with desktop arrow buttons ── */
+function PillsScroller({ baseNames, baseNameFilter, onSelect }: {
+  baseNames: string[];
+  baseNameFilter: string;
+  onSelect: (v: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft]   = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const updateArrows = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 0);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  };
+
+  useEffect(() => {
+    updateArrows();
+    const el = scrollRef.current;
+    el?.addEventListener("scroll", updateArrows, { passive: true });
+    window.addEventListener("resize", updateArrows);
+    return () => {
+      el?.removeEventListener("scroll", updateArrows);
+      window.removeEventListener("resize", updateArrows);
+    };
+  }, [baseNames]);
+
+  const scroll = (dir: "left" | "right") => {
+    scrollRef.current?.scrollBy({ left: dir === "left" ? -200 : 200, behavior: "smooth" });
+  };
+
+  return (
+    <div className="relative mb-4 flex items-center">
+      {/* Left arrow — desktop only */}
+      {canLeft && (
+        <button
+          onClick={() => scroll("left")}
+          className="hidden md:flex absolute left-0 z-10 w-7 h-7 items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm hover:shadow-md text-gray-500 hover:text-gray-800 transition-all flex-shrink-0"
+          style={{ transform: "translateX(-50%)" }}
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      {/* Scrollable container */}
+      <div
+        ref={scrollRef}
+        className="overflow-x-auto hide-scrollbar flex flex-nowrap gap-2 py-0.5 w-full"
+        style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}
+      >
+        <button
+          onClick={() => onSelect("all")}
+          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors min-h-0 ${
+            baseNameFilter === "all"
+              ? "bg-rose-500 text-white border-rose-500"
+              : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"
+          }`}
+        >
+          All
+        </button>
+        {baseNames.map((bn) => (
+          <button
+            key={bn}
+            onClick={() => onSelect(bn)}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors min-h-0 ${
+              baseNameFilter === bn
+                ? "bg-rose-500 text-white border-rose-500"
+                : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"
+            }`}
+          >
+            {bn}
+          </button>
+        ))}
+      </div>
+
+      {/* Right arrow — desktop only */}
+      {canRight && (
+        <button
+          onClick={() => scroll("right")}
+          className="hidden md:flex absolute right-0 z-10 w-7 h-7 items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm hover:shadow-md text-gray-500 hover:text-gray-800 transition-all flex-shrink-0"
+          style={{ transform: "translateX(50%)" }}
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      {/* Right fade hint */}
+      {canRight && (
+        <div className="pointer-events-none absolute top-0 right-0 h-full w-10 bg-gradient-to-l from-gray-50 to-transparent" />
       )}
     </div>
   );
@@ -277,23 +372,11 @@ export default function InventoryPage() {
 
         {/* BaseName filter pills — horizontally scrollable single row */}
         {tab === "all" && baseNames.length > 0 && (
-          <div className="relative mb-4">
-            <div className="overflow-x-auto hide-scrollbar flex flex-nowrap gap-2 pb-0.5"
-              style={{ WebkitOverflowScrolling: "touch" }}>
-              <button onClick={() => setBaseNameFilter("all")}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${baseNameFilter === "all" ? "bg-rose-500 text-white border-rose-500" : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"}`}>
-                All
-              </button>
-              {baseNames.map((bn) => (
-                <button key={bn} onClick={() => setBaseNameFilter(bn)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${baseNameFilter === bn ? "bg-rose-500 text-white border-rose-500" : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"}`}>
-                  {bn}
-                </button>
-              ))}
-            </div>
-            {/* Right-edge fade hint */}
-            <div className="pointer-events-none absolute top-0 right-0 h-full w-8 bg-gradient-to-l from-gray-50 to-transparent" />
-          </div>
+          <PillsScroller
+            baseNames={baseNames}
+            baseNameFilter={baseNameFilter}
+            onSelect={setBaseNameFilter}
+          />
         )}
 
         {loading ? (
