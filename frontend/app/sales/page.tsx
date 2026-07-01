@@ -21,6 +21,7 @@ export default function SalesPage() {
   const [success, setSuccess]         = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [cartOpen, setCartOpen]       = useState(false);
+  const [showSellConfirm, setShowSellConfirm] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -184,9 +185,9 @@ export default function SalesPage() {
           <span className="font-medium text-gray-600">Total</span>
           <span className="text-xl font-bold text-gray-800">{fmt(totalAmount)}</span>
         </div>
-        <button onClick={handleCheckout} disabled={cart.length === 0 || checkingOut}
+        <button onClick={() => setShowSellConfirm(true)} disabled={cart.length === 0 || checkingOut}
           className="w-full bg-rose-500 hover:bg-rose-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-3 rounded-xl text-sm min-h-[44px]">
-          {checkingOut ? "Processing..." : "Checkout"}
+          {checkingOut ? "Processing..." : "Sell"}
         </button>
       </div>
     </>
@@ -303,6 +304,38 @@ export default function SalesPage() {
               <button onClick={() => setCartOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             {cartContent}
+          </div>
+        </div>
+      )}
+
+      {/* Sell confirmation popup */}
+      {showSellConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-[60]">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-sm p-6 animate-slide-up sm:animate-none">
+            <div className="drag-handle sm:hidden mb-1" />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-rose-100 p-2 rounded-lg">
+                <ShoppingCart className="w-5 h-5 text-rose-500" />
+              </div>
+              <h2 className="text-base font-semibold text-gray-800">Confirm Sale</h2>
+            </div>
+            <p className="text-gray-500 text-sm mb-1">
+              {cart.length} item{cart.length !== 1 ? "s" : ""} · <span className="font-semibold text-gray-700">{fmt(totalAmount)}</span>
+            </p>
+            <p className="text-gray-400 text-xs mb-5">Stock will be reduced and the sale will be recorded. This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSellConfirm(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600">
+                Cancel
+              </button>
+              <button
+                onClick={() => { setShowSellConfirm(false); handleCheckout(); }}
+                disabled={checkingOut}
+                className="flex-1 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 text-white px-4 py-2.5 rounded-lg text-sm font-medium">
+                {checkingOut ? "Processing..." : "Yes, Sell"}
+              </button>
+            </div>
           </div>
         </div>
       )}
