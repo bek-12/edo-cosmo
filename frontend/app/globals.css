@@ -63,3 +63,12 @@ button, a, select, input[type="checkbox"], input[type="radio"] {
 .touch-sm {
   min-height: 32px !important;
 }
+
+/* Hide scrollbar visually, keep it functional */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

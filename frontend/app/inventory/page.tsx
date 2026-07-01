@@ -275,19 +275,24 @@ export default function InventoryPage() {
           ))}
         </div>
 
-        {/* BaseName filter pills — only show on "all" tab */}
+        {/* BaseName filter pills — horizontally scrollable single row */}
         {tab === "all" && baseNames.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            <button onClick={() => setBaseNameFilter("all")}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${baseNameFilter === "all" ? "bg-rose-500 text-white border-rose-500" : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"}`}>
-              All
-            </button>
-            {baseNames.map((bn) => (
-              <button key={bn} onClick={() => setBaseNameFilter(bn)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${baseNameFilter === bn ? "bg-rose-500 text-white border-rose-500" : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"}`}>
-                {bn}
+          <div className="relative mb-4">
+            <div className="overflow-x-auto hide-scrollbar flex flex-nowrap gap-2 pb-0.5"
+              style={{ WebkitOverflowScrolling: "touch" }}>
+              <button onClick={() => setBaseNameFilter("all")}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${baseNameFilter === "all" ? "bg-rose-500 text-white border-rose-500" : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"}`}>
+                All
               </button>
-            ))}
+              {baseNames.map((bn) => (
+                <button key={bn} onClick={() => setBaseNameFilter(bn)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${baseNameFilter === bn ? "bg-rose-500 text-white border-rose-500" : "bg-white text-gray-600 border-gray-200 hover:border-rose-300"}`}>
+                  {bn}
+                </button>
+              ))}
+            </div>
+            {/* Right-edge fade hint */}
+            <div className="pointer-events-none absolute top-0 right-0 h-full w-8 bg-gradient-to-l from-gray-50 to-transparent" />
           </div>
         )}
 
