@@ -7,19 +7,20 @@ import axios from "axios";
 
 interface Category { id: string; name: string; }
 interface Product { id: string; name: string; category: Category; sellingPrice: number; stock: number; }
-interface CartItem { product: Product; quantity: number; priceAtSale: number; }
+// priceStr kept as string so typing "65" doesn't snap to "6" on each keystroke
+interface CartItem { product: Product; quantity: number; priceStr: string; }
 
 export default function SalesPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [search, setSearch] = useState("");
+  const [products, setProducts]       = useState<Product[]>([]);
+  const [categories, setCategories]   = useState<Category[]>([]);
+  const [cart, setCart]               = useState<CartItem[]>([]);
+  const [search, setSearch]           = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]         = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess]         = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
-  const [cartOpen, setCartOpen] = useState(false);
+  const [cartOpen, setCartOpen]       = useState(false);
 
   const fetchData = async () => {
     try {
@@ -50,7 +51,7 @@ export default function SalesPage() {
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { product, quantity: 1, priceAtSale: product.sellingPrice }];
+      return [...prev, { product, quantity: 1, priceStr: String(product.sellingPrice) }];
     });
   };
 
@@ -61,21 +62,23 @@ export default function SalesPage() {
     );
   };
 
-  const updatePrice = (productId: string, price: string) => {
-    const parsed = parseFloat(price);
+  // Store raw string — no parsing on every keystroke
+  const updatePrice = (productId: string, val: string) => {
     setCart((prev) =>
-      prev.map((item) =>
-        item.product.id === productId
-          ? { ...item, priceAtSale: isNaN(parsed) || parsed < 0 ? item.priceAtSale : parsed }
-          : item
-      )
+      prev.map((item) => item.product.id === productId ? { ...item, priceStr: val } : item)
     );
   };
 
   const removeFromCart = (productId: string) =>
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
 
-  const totalAmount = cart.reduce((sum, item) => sum + item.priceAtSale * item.quantity, 0);
+  // Parse only when needed for display/checkout — fall back to original sellingPrice
+  const getPrice = (item: CartItem): number => {
+    const n = parseFloat(item.priceStr);
+    return isNaN(n) || n < 0 ? item.product.sellingPrice : n;
+  };
+
+  const totalAmount = cart.reduce((sum, item) => sum + getPrice(item) * item.quantity, 0);
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
@@ -85,7 +88,7 @@ export default function SalesPage() {
         items: cart.map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,
-          priceAtSale: item.priceAtSale,
+          priceAtSale: getPrice(item),
         })),
       });
       setCart([]); setSuccess(true); setCartOpen(false); fetchData();
@@ -100,7 +103,10 @@ export default function SalesPage() {
     new Intl.NumberFormat("en-ET", { style: "currency", currency: "ETB", maximumFractionDigits: 0 })
       .format(n).replace("ETB", "Birr");
 
-  const CartItems = () => (
+  // ── Cart JSX built as a variable, NOT a nested component function.
+  // Defining it as const CartItems = () => (...) inside the render body causes
+  // React to treat it as a new component on every render → input loses focus.
+  const cartContent = (
     <>
       {success && (
         <div className="mx-4 mt-3 px-3 py-2 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-600 text-sm">
@@ -120,8 +126,10 @@ export default function SalesPage() {
         ) : (
           <div className="space-y-2">
             {cart.map((item) => {
-              const isDiscounted = item.priceAtSale < item.product.sellingPrice;
-              const discount = item.product.sellingPrice - item.priceAtSale;
+              const price        = getPrice(item);
+              const originalPrice = item.product.sellingPrice;
+              const isDiscounted  = price < originalPrice;
+              const discount      = originalPrice - price;
               return (
                 <div key={item.product.id} className="p-2.5 bg-gray-50 rounded-lg">
                   <div className="flex items-start gap-2">
@@ -131,7 +139,7 @@ export default function SalesPage() {
                         <span className="text-xs text-gray-400">Birr</span>
                         <input
                           type="number"
-                          value={item.priceAtSale}
+                          value={item.priceStr}
                           onChange={(e) => updatePrice(item.product.id, e.target.value)}
                           min="0"
                           className="w-20 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-rose-400"
@@ -145,7 +153,7 @@ export default function SalesPage() {
                       {isDiscounted && (
                         <p className="text-xs text-amber-500 mt-0.5">− {fmt(discount)} off</p>
                       )}
-                      <p className="text-xs font-bold text-rose-600 mt-0.5">{fmt(item.priceAtSale * item.quantity)}</p>
+                      <p className="text-xs font-bold text-rose-600 mt-0.5">{fmt(price * item.quantity)}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <button onClick={() => removeFromCart(item.product.id)} className="text-gray-300 hover:text-red-400">
@@ -184,7 +192,7 @@ export default function SalesPage() {
     </>
   );
 
-  const ProductGrid = ({ cols }: { cols: string }) => (
+  const productGrid = (cols: string) => (
     <div className={`grid ${cols} gap-2 sm:gap-3`}>
       {filtered.map((p) => {
         const inCart = cart.some((c) => c.product.id === p.id);
@@ -227,7 +235,7 @@ export default function SalesPage() {
             </select>
           </div>
           {loading ? <div className="flex items-center justify-center flex-1 text-gray-400">Loading...</div> : (
-            <div className="overflow-y-auto flex-1"><ProductGrid cols="grid-cols-2 md:grid-cols-3 lg:grid-cols-4" /></div>
+            <div className="overflow-y-auto flex-1">{productGrid("grid-cols-2 md:grid-cols-3 lg:grid-cols-4")}</div>
           )}
         </div>
         <div className="w-80 bg-white border-l border-gray-100 flex flex-col shadow-sm">
@@ -239,7 +247,7 @@ export default function SalesPage() {
               </span>
             )}
           </div>
-          <CartItems />
+          {cartContent}
         </div>
       </div>
 
@@ -265,7 +273,7 @@ export default function SalesPage() {
             </div>
           )}
           {loading ? <div className="flex items-center justify-center h-40 text-gray-400">Loading...</div> : (
-            <ProductGrid cols="grid-cols-2" />
+            productGrid("grid-cols-2")
           )}
         </div>
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-100 shadow-lg px-4 py-3">
@@ -294,7 +302,7 @@ export default function SalesPage() {
               </div>
               <button onClick={() => setCartOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <CartItems />
+            {cartContent}
           </div>
         </div>
       )}
