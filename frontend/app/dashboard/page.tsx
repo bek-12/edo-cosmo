@@ -30,6 +30,12 @@ interface DashboardData {
   pnl: { weekly: PnLData; monthly: PnLData; yearly: PnLData };
 }
 
+function getFontSize(text: string) {
+  if (text.length <= 12) return "text-2xl sm:text-3xl";
+  if (text.length <= 16) return "text-xl";
+  return "text-lg";
+}
+
 function StatCard({ title, value, icon: Icon, color, subtitle, subtitleRed }: {
   title: string; value: string; icon: React.ElementType; color: string; subtitle?: string; subtitleRed?: string;
 }) {
@@ -38,7 +44,7 @@ function StatCard({ title, value, icon: Icon, color, subtitle, subtitleRed }: {
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <p className="text-xs sm:text-sm text-gray-500 font-medium leading-tight">{title}</p>
-          <p className="text-lg sm:text-2xl font-bold text-gray-800 mt-0.5 sm:mt-1 truncate">{value}</p>
+          <p className={`${getFontSize(value)} font-bold text-gray-800 mt-0.5 sm:mt-1 leading-tight break-words`}>{value}</p>
           {subtitle && <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">{subtitle}</p>}
           {subtitleRed && <p className="text-xs text-red-400 mt-0.5 hidden sm:block">{subtitleRed}</p>}
         </div>
@@ -160,9 +166,14 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="my-1 sm:my-2">
-                    <p className="text-lg sm:text-2xl font-bold text-white leading-tight truncate">
-                      {(pnlData.isLoss ?? false) ? "−" : "+"}{fmt(Math.abs(pnlData.netProfit ?? 0))}
-                    </p>
+                    {(() => {
+                      const pnlText = `${(pnlData.isLoss ?? false) ? "−" : "+"}${fmt(Math.abs(pnlData.netProfit ?? 0))}`;
+                      return (
+                        <p className={`${getFontSize(pnlText)} font-bold text-white leading-tight break-words`}>
+                          {pnlText}
+                        </p>
+                      );
+                    })()}
                   </div>
                   <p className={`text-xs font-semibold ${(pnlData.netProfit ?? 0) < 0 ? "text-red-200" : (pnlData.netProfit ?? 0) === 0 ? "text-orange-100" : "text-green-100"}`}>
                     {(pnlData.netProfit ?? 0) > 0 ? "▲ Net Profit" : (pnlData.netProfit ?? 0) < 0 ? "▼ Net Loss" : "◆ Break Even"}
