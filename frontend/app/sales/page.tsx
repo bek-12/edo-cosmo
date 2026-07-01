@@ -61,6 +61,17 @@ export default function SalesPage() {
     );
   };
 
+  const updatePrice = (productId: string, price: string) => {
+    const parsed = parseFloat(price);
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product.id === productId
+          ? { ...item, priceAtSale: isNaN(parsed) || parsed < 0 ? item.priceAtSale : parsed }
+          : item
+      )
+    );
+  };
+
   const removeFromCart = (productId: string) =>
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
 
@@ -108,32 +119,55 @@ export default function SalesPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {cart.map((item) => (
-              <div key={item.product.id} className="flex items-start gap-2 p-2.5 bg-gray-50 rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-700 leading-tight">{item.product.name}</p>
-                  <p className="text-xs text-gray-400">{fmt(item.priceAtSale)} each</p>
-                  <p className="text-xs font-bold text-rose-600 mt-0.5">{fmt(item.priceAtSale * item.quantity)}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <button onClick={() => removeFromCart(item.product.id)} className="text-gray-300 hover:text-red-400">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => updateQty(item.product.id, -1)}
-                      className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center">
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="text-xs font-semibold w-5 text-center">{item.quantity}</span>
-                    <button onClick={() => updateQty(item.product.id, 1)}
-                      disabled={item.quantity >= item.product.stock}
-                      className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center disabled:opacity-40">
-                      <Plus className="w-3 h-3" />
-                    </button>
+            {cart.map((item) => {
+              const isDiscounted = item.priceAtSale < item.product.sellingPrice;
+              const discount = item.product.sellingPrice - item.priceAtSale;
+              return (
+                <div key={item.product.id} className="p-2.5 bg-gray-50 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-700 leading-tight">{item.product.name}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-xs text-gray-400">Birr</span>
+                        <input
+                          type="number"
+                          value={item.priceAtSale}
+                          onChange={(e) => updatePrice(item.product.id, e.target.value)}
+                          min="0"
+                          className="w-20 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-rose-400"
+                        />
+                        {isDiscounted && (
+                          <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                            Discounted
+                          </span>
+                        )}
+                      </div>
+                      {isDiscounted && (
+                        <p className="text-xs text-amber-500 mt-0.5">− {fmt(discount)} off</p>
+                      )}
+                      <p className="text-xs font-bold text-rose-600 mt-0.5">{fmt(item.priceAtSale * item.quantity)}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <button onClick={() => removeFromCart(item.product.id)} className="text-gray-300 hover:text-red-400">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => updateQty(item.product.id, -1)}
+                          className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center">
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-xs font-semibold w-5 text-center">{item.quantity}</span>
+                        <button onClick={() => updateQty(item.product.id, 1)}
+                          disabled={item.quantity >= item.product.stock}
+                          className="w-6 h-6 bg-gray-200 hover:bg-rose-100 rounded flex items-center justify-center disabled:opacity-40">
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

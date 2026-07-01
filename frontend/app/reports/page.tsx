@@ -31,6 +31,15 @@ interface SummaryData {
   topProducts: SummaryTopProduct[]; salesByDay: SummaryDay[];
 }
 
+/* ── Purchase Report Types ── */
+interface SpendingDay { date: string; amount: number; }
+interface TopRestockedProduct { productId: string; productName: string; category: string; totalQty: number; totalCost: number; }
+interface RecentPurchase { id: string; date: string; productName: string; category: string; quantity: number; buyingPrice: number; totalCost: number; restockedBy: string; }
+interface PurchaseReport {
+  period: string; totalSpent: number; totalPurchases: number; totalUnitsRestocked: number;
+  spendingByDay: SpendingDay[]; topRestockedProducts: TopRestockedProduct[]; recentPurchases: RecentPurchase[];
+}
+
 /* ── Helpers ── */
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-ET", { style: "currency", currency: "ETB", maximumFractionDigits: 0 })
@@ -69,10 +78,86 @@ function fmtBirr(n: number) {
     .format(n).replace("ETB", "Birr");
 }
 
-async function exportPDF(summary: SummaryData) {
-  // Dynamic import so Next.js doesn't SSR these browser-only modules
+function exportPurchaseCSV(report: PurchaseReport) {
+  const rows = [
+    ["Period", report.period],
+    ["Total Spent", report.totalSpent],
+    ["Purchases Made", report.totalPurchases],
+    ["Units Restocked", report.totalUnitsRestocked],
+    [],
+    ["Date", "Product", "Category", "Qty", "Buying Price", "Total Cost", "Restocked By"],
+    ...report.recentPurchases.map((p) => [
+      new Date(p.date).toLocaleString(), p.productName, p.category,
+      p.quantity, p.buyingPrice, p.totalCost, p.restockedBy,
+    ]),
+  ];
+  const csv = rows.map((r) => r.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `purchases-${report.period}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportPurchasePDF(report: PurchaseReport) {
   const { default: jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const INDIGO = [79, 70, 229]   as [number, number, number];
+  const DARK   = [17, 24, 39]    as [number, number, number];
+  const GRAY   = [107, 114, 128] as [number, number, number];
+  const periodLabel = report.period.charAt(0).toUpperCase() + report.period.slice(1);
+  const now = new Date().toLocaleString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  let y = 18;
+  doc.setFillColor(...INDIGO);
+  doc.rect(0, 0, 210, 14, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13); doc.setFont("helvetica", "bold");
+  doc.text("Cosmetics Shop — Purchases Report", 14, 9.5);
+  doc.setTextColor(...DARK); doc.setFontSize(16); doc.setFont("helvetica", "bold");
+  doc.text(`${periodLabel} Purchases`, 14, y + 6); y += 14;
+  doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(...GRAY);
+  doc.text(`Generated: ${now}`, 14, y); y += 10;
+  // KPIs
+  const kpis = [
+    { label: "Total Spent",       value: fmtBirr(report.totalSpent) },
+    { label: "Purchases Made",    value: String(report.totalPurchases) },
+    { label: "Units Restocked",   value: String(report.totalUnitsRestocked) },
+  ];
+  const boxW = 58, boxH = 16, gap = 3, startX = 14;
+  kpis.forEach((kpi, i) => {
+    const x = startX + i * (boxW + gap);
+    doc.setFillColor(248, 250, 252); doc.roundedRect(x, y, boxW, boxH, 2, 2, "F");
+    doc.setDrawColor(224, 231, 255); doc.roundedRect(x, y, boxW, boxH, 2, 2, "S");
+    doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(...GRAY);
+    doc.text(kpi.label.toUpperCase(), x + 3, y + 5);
+    doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(...DARK);
+    doc.text(kpi.value, x + 3, y + 12);
+  });
+  y += boxH + 10;
+  doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(...DARK);
+  doc.text("Recent Purchases", 14, y); y += 4;
+  autoTable(doc, {
+    startY: y,
+    head: [["Date", "Product", "Category", "Qty", "Unit Price", "Total"]],
+    body: report.recentPurchases.map((p) => [
+      new Date(p.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      p.productName, p.category, String(p.quantity),
+      fmtBirr(p.buyingPrice), fmtBirr(p.totalCost),
+    ]),
+    theme: "striped",
+    styles: { fontSize: 9, cellPadding: 5 },
+    headStyles: { fillColor: INDIGO, textColor: [255, 255, 255] as [number,number,number], fontStyle: "bold" },
+    columnStyles: {
+      0: { cellWidth: 32 }, 1: { cellWidth: 50 }, 2: { cellWidth: 28 },
+      3: { cellWidth: 14, halign: "center" }, 4: { cellWidth: 28, halign: "right" }, 5: { cellWidth: 30, halign: "right" },
+    },
+    margin: { left: 14, right: 14 },
+  });
+  doc.save(`purchases-${report.period}-${new Date().toISOString().split("T")[0]}.pdf`);
+}
+
+async function exportPDF(summary: SummaryData) {
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const periodLabel = summary.period.charAt(0).toUpperCase() + summary.period.slice(1);
@@ -304,13 +389,158 @@ function SummarySection({ onSummaryReady }: { onSummaryReady: (s: SummaryData | 
   );
 }
 
+/* ── Purchases Section Component ── */
+function PurchasesSection({ onReportReady }: { onReportReady: (r: PurchaseReport | null) => void }) {
+  const [period, setPeriod] = useState<"weekly" | "monthly" | "yearly">("weekly");
+  const [report, setReport] = useState<PurchaseReport | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchReport = useCallback(() => {
+    setLoading(true);
+    api.get(`/api/stock/report?period=${period}`)
+      .then((r) => { setReport(r.data); onReportReady(r.data); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [period, onReportReady]);
+
+  useEffect(() => { fetchReport(); }, [fetchReport]);
+
+  const tabs = [
+    { key: "weekly",  label: "Weekly"  },
+    { key: "monthly", label: "Monthly" },
+    { key: "yearly",  label: "Yearly"  },
+  ] as const;
+
+  return (
+    <div className="mb-6 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 pt-4 border-b border-gray-100 pb-3">
+        <h2 className="text-sm sm:text-base font-semibold text-gray-800">Purchases Report</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          {tabs.map((t) => (
+            <button key={t.key} onClick={() => setPeriod(t.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                period === t.key ? "bg-indigo-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-4 sm:p-5">
+        {loading ? (
+          <div className="h-40 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
+        ) : report ? (
+          <>
+            {/* KPI row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+              {[
+                { label: "Total Spent",       value: fmt(report.totalSpent),              sub: "purchasing cost",  accent: "text-indigo-600" },
+                { label: "Purchases Made",    value: String(report.totalPurchases),       sub: "restock events",   accent: "text-purple-600" },
+                { label: "Units Restocked",   value: String(report.totalUnitsRestocked),  sub: "total units added", accent: "text-teal-600"  },
+              ].map((kpi, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs text-gray-500">{kpi.label}</p>
+                  <p className={`text-base sm:text-lg font-bold mt-0.5 ${kpi.accent}`}>{kpi.value}</p>
+                  <p className="text-xs text-gray-400">{kpi.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Spending chart */}
+            <div className="mb-5">
+              <h3 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Spending Over Time</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={report.spendingByDay} barCategoryGap="30%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v: number) => fmt(v)} />
+                  <Bar dataKey="amount" name="Spent" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Top restocked products */}
+            <div className="mb-5">
+              <h3 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Most Restocked Products</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-400 text-xs border-b border-gray-100">
+                      <th className="pb-2 font-medium w-8">#</th>
+                      <th className="pb-2 font-medium">Product</th>
+                      <th className="pb-2 font-medium hidden sm:table-cell">Category</th>
+                      <th className="pb-2 font-medium text-right">Units</th>
+                      <th className="pb-2 font-medium text-right">Total Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.topRestockedProducts.length === 0 ? (
+                      <tr><td colSpan={5} className="py-4 text-center text-gray-400 text-xs">No data</td></tr>
+                    ) : report.topRestockedProducts.map((p, i) => (
+                      <tr key={p.productId} className="border-b border-gray-50">
+                        <td className="py-2 text-gray-400 font-bold text-xs">{i + 1}</td>
+                        <td className="py-2 font-medium text-gray-700 text-xs">{p.productName}</td>
+                        <td className="py-2 text-gray-400 text-xs hidden sm:table-cell">{p.category}</td>
+                        <td className="py-2 text-right text-gray-600 text-xs">{p.totalQty}</td>
+                        <td className="py-2 text-right font-semibold text-indigo-600 text-xs">{fmt(p.totalCost)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Recent purchases */}
+            <div>
+              <h3 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Recent Purchases</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-400 text-xs border-b border-gray-100">
+                      <th className="pb-2 font-medium">Date</th>
+                      <th className="pb-2 font-medium">Product</th>
+                      <th className="pb-2 font-medium text-right">Qty</th>
+                      <th className="pb-2 font-medium text-right hidden sm:table-cell">Unit Price</th>
+                      <th className="pb-2 font-medium text-right">Total</th>
+                      <th className="pb-2 font-medium hidden md:table-cell">By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.recentPurchases.map((p, i) => (
+                      <tr key={p.id} className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                        <td className="py-2 text-gray-500 text-xs whitespace-nowrap">
+                          {new Date(p.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </td>
+                        <td className="py-2 font-medium text-gray-700 text-xs">{p.productName}</td>
+                        <td className="py-2 text-right text-gray-600 text-xs">+{p.quantity}</td>
+                        <td className="py-2 text-right text-gray-500 text-xs hidden sm:table-cell">{fmt(p.buyingPrice)}</td>
+                        <td className="py-2 text-right font-semibold text-indigo-600 text-xs">{fmt(p.totalCost)}</td>
+                        <td className="py-2 text-gray-400 text-xs hidden md:table-cell">{p.restockedBy}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /* ── Main Page ── */
 export default function ReportsPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [activeTab, setActiveTab] = useState<"sales" | "purchases">("sales");
   const [currentSummary, setCurrentSummary] = useState<SummaryData | null>(null);
+  const [currentPurchaseReport, setCurrentPurchaseReport] = useState<PurchaseReport | null>(null);
   const [returnSale, setReturnSale] = useState<Sale | null>(null);
   const [eligibility, setEligibility] = useState<{ eligible: boolean; hoursSinceSale: number } | null>(null);
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
@@ -389,29 +619,58 @@ export default function ReportsPage() {
   return (
     <Layout>
       <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+        {/* Page header */}
         <div className="flex items-start justify-between mb-4 sm:mb-6">
           <div>
-            <h1 className="text-xl sm:text-3xl font-bold text-gray-800">Sales Reports</h1>
-            <p className="text-gray-500 text-xs sm:text-sm mt-0.5">View, filter and process returns</p>
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-800">Reports</h1>
+            <p className="text-gray-500 text-xs sm:text-sm mt-0.5">Sales, purchases and returns overview</p>
           </div>
-          {currentSummary && (
-            <div className="flex items-center gap-2 mt-1">
-              <button onClick={() => exportCSV(currentSummary)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
-                <Download className="w-4 h-4" />CSV
-              </button>
-              <button onClick={() => exportPDF(currentSummary)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-sm font-medium transition-colors border border-rose-200">
-                <Download className="w-4 h-4" />PDF
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2 mt-1">
+            {activeTab === "sales" && currentSummary && (
+              <>
+                <button onClick={() => exportCSV(currentSummary)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+                  <Download className="w-4 h-4" />Sales CSV
+                </button>
+                <button onClick={() => exportPDF(currentSummary)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-sm font-medium transition-colors border border-rose-200">
+                  <Download className="w-4 h-4" />Sales PDF
+                </button>
+              </>
+            )}
+            {activeTab === "purchases" && currentPurchaseReport && (
+              <>
+                <button onClick={() => exportPurchaseCSV(currentPurchaseReport)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors">
+                  <Download className="w-4 h-4" />Purchases CSV
+                </button>
+                <button onClick={() => exportPurchasePDF(currentPurchaseReport)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-sm font-medium transition-colors border border-indigo-200">
+                  <Download className="w-4 h-4" />Purchases PDF
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Summary section at top */}
-        <SummarySection onSummaryReady={setCurrentSummary} />
+        {/* Sales / Purchases tab toggle */}
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-5">
+          <button onClick={() => setActiveTab("sales")}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === "sales" ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
+            Sales Report
+          </button>
+          <button onClick={() => setActiveTab("purchases")}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === "purchases" ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
+            Purchases Report
+          </button>
+        </div>
 
-        {/* Filters */}
+        {/* Report sections */}
+        {activeTab === "sales" && <SummarySection onSummaryReady={setCurrentSummary} />}
+        {activeTab === "purchases" && <PurchasesSection onReportReady={setCurrentPurchaseReport} />}
+
+        {/* Filters — only on sales tab */}
+        {activeTab === "sales" && (
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 sm:gap-4 mb-5">
           <div className="flex gap-3">
             <div className="flex-1 sm:flex-none">
@@ -443,8 +702,9 @@ export default function ReportsPage() {
             </div>
           </div>
         </div>
+        )}
 
-        {loading ? (
+        {activeTab === "sales" && (loading ? (
           <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>
         ) : (
           <>
@@ -528,7 +788,7 @@ export default function ReportsPage() {
               })}
             </div>
           </>
-        )}
+        ))}
       </div>
 
       {/* Return Modal */}

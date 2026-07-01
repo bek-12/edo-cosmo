@@ -48,7 +48,7 @@ model Product {
   buyingPrice     Float
   sellingPrice    Float
   stock           Int             @default(0)
-  lowStockAlert   Int             @default(5)
+  lowStockAlert   Int             @default(3)
   expiryDate      DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt

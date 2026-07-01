@@ -133,4 +133,106 @@ router.get("/stats", authenticate, async (_req: AuthRequest, res: Response): Pro
   }
 });
 
+// GET /api/stock/report?period=weekly|monthly|yearly
+router.get("/report", authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const period = (req.query.period as string) || "weekly";
+    const now    = new Date();
+    let startDate: Date;
+
+    if (period === "yearly") {
+      startDate = new Date(now.getFullYear(), 0, 1);
+    } else if (period === "monthly") {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else {
+      // weekly — last 7 days
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    const where = { createdAt: { gte: startDate } };
+
+    // Aggregates
+    const [agg, purchases] = await Promise.all([
+      prisma.stockPurchase.aggregate({
+        where,
+        _sum: { totalCost: true, quantity: true },
+        _count: { id: true },
+      }),
+      prisma.stockPurchase.findMany({
+        where,
+        include: {
+          product: { select: { id: true, name: true, category: { select: { name: true } } } },
+          cashier: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    // Spending by day/bucket
+    const bucketMap: Record<string, number> = {};
+    for (const p of purchases) {
+      let key: string;
+      const d = new Date(p.createdAt);
+      if (period === "weekly") {
+        key = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      } else if (period === "monthly") {
+        // group by week number within month
+        const weekNum = Math.ceil(d.getDate() / 7);
+        key = `Week ${weekNum}`;
+      } else {
+        key = d.toLocaleDateString("en-US", { month: "short" });
+      }
+      bucketMap[key] = (bucketMap[key] ?? 0) + p.totalCost;
+    }
+    const spendingByDay = Object.entries(bucketMap).map(([date, amount]) => ({ date, amount }));
+
+    // Top restocked products in period
+    const productTotals: Record<string, { productName: string; category: string; totalQty: number; totalCost: number }> = {};
+    for (const p of purchases) {
+      const pid = p.productId;
+      if (!productTotals[pid]) {
+        productTotals[pid] = {
+          productName: p.product.name,
+          category: p.product.category.name,
+          totalQty: 0,
+          totalCost: 0,
+        };
+      }
+      productTotals[pid].totalQty  += p.quantity;
+      productTotals[pid].totalCost += p.totalCost;
+    }
+    const topRestockedProducts = Object.entries(productTotals)
+      .map(([productId, v]) => ({ productId, ...v }))
+      .sort((a, b) => b.totalCost - a.totalCost)
+      .slice(0, 10);
+
+    // Recent 10 purchases
+    const recentPurchases = purchases.slice(0, 10).map((p) => ({
+      id: p.id,
+      date: p.createdAt,
+      productName: p.product.name,
+      category: p.product.category.name,
+      quantity: p.quantity,
+      buyingPrice: p.buyingPrice,
+      totalCost: p.totalCost,
+      restockedBy: p.cashier.name,
+    }));
+
+    res.json({
+      period,
+      totalSpent: agg._sum.totalCost ?? 0,
+      totalPurchases: agg._count.id,
+      totalUnitsRestocked: agg._sum.quantity ?? 0,
+      spendingByDay,
+      topRestockedProducts,
+      recentPurchases,
+    });
+  } catch (error) {
+    console.error("Stock report error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 export default router;
