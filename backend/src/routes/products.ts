@@ -28,20 +28,38 @@ router.post("/", authenticate, requireAdmin, async (req: AuthRequest, res: Respo
     return;
   }
 
+  const initialStock = Number(stock ?? 0);
+  const bp = Number(buyingPrice);
+
   try {
     const product = await prisma.product.create({
       data: {
         name,
         baseName: baseName || null,
         categoryId,
-        buyingPrice: Number(buyingPrice),
+        buyingPrice: bp,
         sellingPrice: Number(sellingPrice),
-        stock: Number(stock ?? 0),
-        lowStockAlert: 5,
+        stock: initialStock,
+        lowStockAlert: 3,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
       },
       include: { category: true },
     });
+
+    // Auto-log a StockPurchase for the initial stock so it appears in purchase reports
+    if (initialStock > 0 && bp > 0) {
+      await prisma.stockPurchase.create({
+        data: {
+          productId: product.id,
+          cashierId: req.user!.id,
+          quantity: initialStock,
+          buyingPrice: bp,
+          totalCost: initialStock * bp,
+          note: "Initial stock",
+        },
+      });
+    }
+
     res.status(201).json(product);
   } catch (error) {
     console.error("Create product error:", error);
