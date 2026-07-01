@@ -29,7 +29,7 @@ const navItems = [
   { href: "/sales",      label: "Sales (POS)",   icon: ShoppingCart },
   { href: "/reports",    label: "Reports",       icon: BarChart2 },
   { href: "/returns",    label: "Returns",       icon: RotateCcw },
-  { href: "/stock",      label: "Stock History", icon: PackagePlus },
+  { href: "/stock",      label: "Restock History", icon: PackagePlus },
 ];
 
 // ── Shared nav content (used in both desktop sidebar + mobile drawer) ──────

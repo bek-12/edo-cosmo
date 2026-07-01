@@ -128,7 +128,7 @@ export default function StockPage() {
 
   const fetchPurchases = useCallback((p: number) => {
     setLoading(true);
-    api.get(`/api/stock/purchases?page=${p}&limit=${LIMIT}`)
+    api.get(`/api/stock/purchases?page=${p}&limit=${LIMIT}&restockOnly=true`)
       .then((res) => setData(res.data))
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -157,8 +157,8 @@ export default function StockPage() {
       <div className="p-4 sm:p-6 max-w-7xl mx-auto">
         {/* Page header */}
         <div className="mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-3xl font-bold text-gray-800">Stock History</h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">All restock and purchase records</p>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-800">Restock History</h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5">All restock records</p>
         </div>
 
         {/* Stats row */}

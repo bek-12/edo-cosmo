@@ -66,14 +66,26 @@ router.post("/restock", authenticate, async (req: AuthRequest, res: Response): P
 });
 
 // GET /api/stock/purchases  (with pagination)
+// ?restockOnly=true  excludes auto-created "Initial stock" records (from product creation)
 router.get("/purchases", authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const page  = Math.max(1, parseInt(String(req.query.page  ?? 1)));
-    const limit = Math.max(1, parseInt(String(req.query.limit ?? 15)));
-    const skip  = (page - 1) * limit;
+    const page        = Math.max(1, parseInt(String(req.query.page  ?? 1)));
+    const limit       = Math.max(1, parseInt(String(req.query.limit ?? 15)));
+    const skip        = (page - 1) * limit;
+    const restockOnly = req.query.restockOnly === "true";
+
+    // Exclude auto-generated initial-stock records when restockOnly is set
+    const where = restockOnly
+      ? {
+          NOT: {
+            note: { in: ["Initial stock", "Initial stock (backfilled)"] },
+          },
+        }
+      : {};
 
     const [purchases, total] = await Promise.all([
       prisma.stockPurchase.findMany({
+        where,
         include: {
           product: { select: { id: true, name: true, category: { select: { name: true } } } },
           cashier: { select: { id: true, name: true } },
@@ -82,7 +94,7 @@ router.get("/purchases", authenticate, async (req: AuthRequest, res: Response): 
         skip,
         take: limit,
       }),
-      prisma.stockPurchase.count(),
+      prisma.stockPurchase.count({ where }),
     ]);
 
     res.json({ purchases, total, page, limit, totalPages: Math.ceil(total / limit) });
