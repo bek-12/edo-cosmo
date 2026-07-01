@@ -104,18 +104,25 @@ router.get("/purchases", authenticate, async (req: AuthRequest, res: Response): 
   }
 });
 
-// GET /api/stock/stats  – top restocked products + total invested
+// GET /api/stock/stats  – top restocked products + total invested (restock events only)
 router.get("/stats", authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const restockOnly = {
+      NOT: {
+        note: { in: ["Initial stock", "Initial stock (backfilled)"] },
+      },
+    };
+
     const [grouped, totalInvested] = await Promise.all([
       prisma.stockPurchase.groupBy({
+        where: restockOnly,
         by: ["productId"],
         _sum: { quantity: true, totalCost: true },
         _count: { id: true },
         orderBy: { _sum: { quantity: "desc" } },
         take: 5,
       }),
-      prisma.stockPurchase.aggregate({ _sum: { totalCost: true } }),
+      prisma.stockPurchase.aggregate({ where: restockOnly, _sum: { totalCost: true } }),
     ]);
 
     // fetch product names
