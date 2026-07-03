@@ -31,15 +31,12 @@ router.get("/summary", authenticate, async (req: AuthRequest, res: Response): Pr
     const totalRevenue = (salesAgg._sum.totalAmount ?? 0) - (returnsAgg._sum.totalAmount ?? 0);
     const returnRate = salesCount > 0 ? (returnsCount / salesCount) * 100 : 0;
 
-    // Total spent = buying cost of items sold in this period
-    const saleItems = await prisma.saleItem.findMany({
-      where: { sale: { createdAt: { gte: start } } },
-      include: { product: { select: { buyingPrice: true } } },
+    // Total spent = all stock purchases in this period (cash-flow based, same as Dashboard P&L)
+    const purchasesAgg = await prisma.stockPurchase.aggregate({
+      where: { createdAt: { gte: start } },
+      _sum: { totalCost: true },
     });
-    const totalSpent = saleItems.reduce(
-      (sum, item) => sum + item.quantity * item.product.buyingPrice,
-      0
-    );
+    const totalSpent = purchasesAgg._sum.totalCost ?? 0;
     const netProfit = totalRevenue - totalSpent;
 
     // Top 10 products — group only by productId
@@ -67,13 +64,13 @@ router.get("/summary", authenticate, async (req: AuthRequest, res: Response): Pr
       })
     );
 
-    // Helper to compute day/week/month spent
+    // Helper: stock purchase spend in a window (cash-flow based)
     const getSpent = async (from: Date, to: Date): Promise<number> => {
-      const items = await prisma.saleItem.findMany({
-        where: { sale: { createdAt: { gte: from, lt: to } } },
-        include: { product: { select: { buyingPrice: true } } },
+      const result = await prisma.stockPurchase.aggregate({
+        where: { createdAt: { gte: from, lt: to } },
+        _sum: { totalCost: true },
       });
-      return items.reduce((sum, it) => sum + it.quantity * it.product.buyingPrice, 0);
+      return result._sum.totalCost ?? 0;
     };
 
     // Sales by day/week/month

@@ -321,11 +321,11 @@ function SummarySection({ onSummaryReady }: { onSummaryReady: (s: SummaryData | 
               {[
                 { label: "Total Sales", value: String(summary.totalSales), sub: "transactions" },
                 { label: "Revenue", value: fmt(summary.totalRevenue), sub: "after returns" },
-                { label: "Spent", value: fmt(summary.totalSpent), sub: "buying cost" },
+                { label: "Spent", value: fmt(summary.totalSpent), sub: "stock purchases" },
                 {
                   label: summary.isLoss ? "Net Loss" : "Net Profit",
                   value: `${summary.isLoss ? "−" : "+"}${fmt(Math.abs(summary.netProfit))}`,
-                  sub: `Return rate ${summary.returnRate}%`,
+                  sub: `Return rate ${summary.returnRate}% · sales minus restocking`,
                   accent: summary.isLoss ? "text-red-600" : "text-emerald-600",
                 },
               ].map((kpi, i) => (
