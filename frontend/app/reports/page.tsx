@@ -230,18 +230,22 @@ function SummarySection({ period, onSummaryReady }: {
   );
 }
 
-function PurchasesSection({ period, onReportReady }: {
+function PurchasesSection({ period, from, to, onReportReady }: {
   period: "weekly" | "monthly" | "yearly";
+  from: string; to: string;
   onReportReady: (r: PurchaseReport | null) => void;
 }) {
   const [report, setReport] = useState<PurchaseReport | null>(null);
   const [loading, setLoading] = useState(false);
   const fetch = useCallback(() => {
     setLoading(true);
-    api.get(`/api/stock/report?period=${period}`)
+    const params = new URLSearchParams({ period });
+    if (from) params.set("from", from);
+    if (to)   params.set("to",   to);
+    api.get(`/api/stock/report?${params.toString()}`)
       .then((r) => { setReport(r.data); onReportReady(r.data); })
       .catch(console.error).finally(() => setLoading(false));
-  }, [period, onReportReady]);
+  }, [period, from, to, onReportReady]);
   useEffect(() => { fetch(); }, [fetch]);
   return (
     <div className="mb-4 bg-white rounded-xl border border-gray-100 shadow-sm p-4 sm:p-5">
@@ -274,8 +278,10 @@ export default function ReportsPage() {
   const [salesLoading, setSalesLoading] = useState(true);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate]     = useState("");
-  const [salesSearch, setSalesSearch]     = useState("");
+  const [salesSearch, setSalesSearch]         = useState("");
   const [purchasesSearch, setPurchasesSearch] = useState("");
+  const [purchasesFromDate, setPurchasesFromDate] = useState("");
+  const [purchasesToDate, setPurchasesToDate]     = useState("");
   const [currentSummary, setCurrentSummary]               = useState<SummaryData | null>(null);
   const [currentPurchaseReport, setCurrentPurchaseReport] = useState<PurchaseReport | null>(null);
   const [returnSale, setReturnSale]   = useState<Sale | null>(null);
@@ -296,7 +302,10 @@ export default function ReportsPage() {
   }, []);
 
   // Clear manual dates and search when period changes
-  useEffect(() => { setFromDate(""); setToDate(""); setSalesSearch(""); }, [period]);
+  useEffect(() => {
+    setFromDate(""); setToDate(""); setSalesSearch("");
+    setPurchasesFromDate(""); setPurchasesToDate(""); setPurchasesSearch("");
+  }, [period]);
 
   const fetchSales = useCallback(() => {
     setSalesLoading(true);
@@ -419,7 +428,7 @@ export default function ReportsPage() {
 
         {/* Stat cards */}
         {activeTab === "sales"     && <SummarySection   period={period} onSummaryReady={setCurrentSummary} />}
-        {activeTab === "purchases" && <PurchasesSection period={period} onReportReady={setCurrentPurchaseReport} />}
+        {activeTab === "purchases" && <PurchasesSection period={period} from={purchasesFromDate} to={purchasesToDate} onReportReady={setCurrentPurchaseReport} />}
 
         {/* Sales tab */}
         {activeTab === "sales" && (
@@ -581,16 +590,45 @@ export default function ReportsPage() {
         {/* Purchases tab table */}
         {activeTab === "purchases" && currentPurchaseReport && (
           <>
-            {/* Purchases search */}
-            <div className="relative mb-4 w-full sm:w-72 sm:ml-auto">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by product name..."
-                value={purchasesSearch}
-                onChange={(e) => setPurchasesSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
-              />
+            {/* Purchases filters + search */}
+            <div className="mb-5">
+              <p className="text-xs text-gray-400 mb-2 italic">Optional: override the period above with a custom date range for the table below</p>
+              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                {/* Left: From / To */}
+                <div className="flex gap-3">
+                  <div className="flex-1 sm:flex-none">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input type="date" value={purchasesFromDate} onChange={(e) => setPurchasesFromDate(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    </div>
+                  </div>
+                  <div className="flex-1 sm:flex-none">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input type="date" value={purchasesToDate} onChange={(e) => setPurchasesToDate(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    </div>
+                  </div>
+                  {(purchasesFromDate || purchasesToDate) && (
+                    <button onClick={() => { setPurchasesFromDate(""); setPurchasesToDate(""); }}
+                      className="text-sm text-gray-400 hover:text-indigo-500 self-end pb-1">Clear</button>
+                  )}
+                </div>
+                {/* Right: Search */}
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by product name..."
+                    value={purchasesSearch}
+                    onChange={(e) => setPurchasesSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+              </div>
             </div>
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">

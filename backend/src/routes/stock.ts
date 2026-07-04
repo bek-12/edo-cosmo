@@ -152,14 +152,20 @@ router.get("/stats", authenticate, async (_req: AuthRequest, res: Response): Pro
   }
 });
 
-// GET /api/stock/report?period=weekly|monthly|yearly
+// GET /api/stock/report?period=weekly|monthly|yearly&from=YYYY-MM-DD&to=YYYY-MM-DD
 router.get("/report", authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const period = ((req.query.period as string) || "weekly").toLowerCase();
+    const fromQ  = req.query.from as string | undefined;
+    const toQ    = req.query.to   as string | undefined;
     const now    = new Date();
     let startDate: Date;
+    let endDate: Date = new Date(now.getTime() + 24 * 60 * 60 * 1000); // tomorrow
 
-    if (period === "yearly") {
+    if (fromQ) {
+      startDate = new Date(fromQ);
+      startDate.setHours(0, 0, 0, 0);
+    } else if (period === "yearly") {
       startDate = new Date(now);
       startDate.setFullYear(now.getFullYear() - 1);
       startDate.setHours(0, 0, 0, 0);
@@ -168,13 +174,17 @@ router.get("/report", authenticate, async (req: AuthRequest, res: Response): Pro
       startDate.setDate(now.getDate() - 30);
       startDate.setHours(0, 0, 0, 0);
     } else {
-      // weekly — last 7 days
       startDate = new Date(now);
       startDate.setDate(now.getDate() - 7);
       startDate.setHours(0, 0, 0, 0);
     }
 
-    const where = { createdAt: { gte: startDate } };
+    if (toQ) {
+      endDate = new Date(toQ);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    const where = { createdAt: { gte: startDate, lt: endDate } };
 
     // Aggregates
     const [agg, purchases] = await Promise.all([
