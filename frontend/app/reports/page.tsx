@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
-import { DollarSign, Calendar, RotateCcw, X, AlertTriangle, CheckCircle, Download } from "lucide-react";
+import { Calendar, RotateCcw, X, AlertTriangle, CheckCircle, Download } from "lucide-react";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -308,8 +308,6 @@ export default function ReportsPage() {
 
   useEffect(() => { fetchSales(); }, [fetchSales]);
 
-  const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
-
   const openReturn = async (sale: Sale) => {
     setReturnSale(sale); setReturnReason(""); setReturnError(""); setReturnSuccess(""); setShowConfirm(false);
     try {
@@ -425,7 +423,7 @@ export default function ReportsPage() {
         {activeTab === "sales" && (
           <>
             {/* Custom date range override */}
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 sm:gap-4 mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-5">
               <div>
                 <p className="text-xs text-gray-400 mb-2 italic">Optional: override the period above with a custom date range for the table below</p>
                 <div className="flex gap-3">
@@ -449,13 +447,6 @@ export default function ReportsPage() {
                     <button onClick={() => { setFromDate(""); setToDate(""); }}
                       className="text-sm text-gray-400 hover:text-rose-500 self-end pb-1">Clear</button>
                   )}
-                </div>
-              </div>
-              <div className="w-full sm:w-auto sm:ml-auto bg-rose-50 border border-rose-100 rounded-xl px-4 py-3 flex items-center gap-3">
-                <DollarSign className="w-5 h-5 text-rose-500 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-gray-500">Total Revenue (table)</p>
-                  <p className="text-lg font-bold text-rose-600">{fmt(totalRevenue)}</p>
                 </div>
               </div>
             </div>
