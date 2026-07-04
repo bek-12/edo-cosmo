@@ -231,8 +231,8 @@ router.get("/report", authenticate, async (req: AuthRequest, res: Response): Pro
       .sort((a, b) => b.totalCost - a.totalCost)
       .slice(0, 10);
 
-    // Recent 10 purchases
-    const recentPurchases = purchases.slice(0, 10).map((p) => ({
+    // All purchases in period (already period-filtered by `where`)
+    const recentPurchases = purchases.map((p) => ({
       id: p.id,
       date: p.createdAt,
       productName: p.product.name,

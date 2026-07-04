@@ -5,10 +5,21 @@ import { authenticate, AuthRequest } from "../middleware/auth";
 const router = Router();
 const prisma = new PrismaClient();
 
-// GET /api/sales
-router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
+// GET /api/sales  — optional ?from=YYYY-MM-DD&to=YYYY-MM-DD filtering
+router.get("/", authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const { from, to } = req.query as { from?: string; to?: string };
+
+    const where: Record<string, unknown> = {};
+    if (from || to) {
+      const createdAt: Record<string, Date> = {};
+      if (from) createdAt.gte = new Date(from);
+      if (to)   createdAt.lte = new Date(to + "T23:59:59.999Z");
+      where.createdAt = createdAt;
+    }
+
     const sales = await prisma.sale.findMany({
+      where,
       include: {
         cashier: { select: { id: true, name: true, email: true } },
         items: {
