@@ -424,10 +424,11 @@ export default function ReportsPage() {
         {/* Sales tab */}
         {activeTab === "sales" && (
           <>
-            {/* Custom date range override */}
-            <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-5">
-              <div>
-                <p className="text-xs text-gray-400 mb-2 italic">Optional: override the period above with a custom date range for the table below</p>
+            {/* Filters + Search — one row on desktop, stacked on mobile */}
+            <div className="mb-5">
+              <p className="text-xs text-gray-400 mb-2 italic">Optional: override the period above with a custom date range for the table below</p>
+              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                {/* Left: From / To pickers */}
                 <div className="flex gap-3">
                   <div className="flex-1 sm:flex-none">
                     <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
@@ -450,19 +451,18 @@ export default function ReportsPage() {
                       className="text-sm text-gray-400 hover:text-rose-500 self-end pb-1">Clear</button>
                   )}
                 </div>
+                {/* Right: Search */}
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by product or cashier..."
+                    value={salesSearch}
+                    onChange={(e) => setSalesSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                  />
+                </div>
               </div>
-            </div>
-
-            {/* Sales search */}
-            <div className="relative mb-4 w-full sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by product or cashier..."
-                value={salesSearch}
-                onChange={(e) => setSalesSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
-              />
             </div>
 
             {salesLoading ? (
@@ -580,20 +580,19 @@ export default function ReportsPage() {
 
         {/* Purchases tab table */}
         {activeTab === "purchases" && currentPurchaseReport && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <>
             {/* Purchases search */}
-            <div className="p-4 border-b border-gray-100">
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by product name..."
-                  value={purchasesSearch}
-                  onChange={(e) => setPurchasesSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
-                />
-              </div>
+            <div className="relative mb-4 w-full sm:w-72 sm:ml-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by product name..."
+                value={purchasesSearch}
+                onChange={(e) => setPurchasesSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+              />
             </div>
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
@@ -635,6 +634,7 @@ export default function ReportsPage() {
               </table>
             </div>
           </div>
+          </>
         )}
       </div>
 
