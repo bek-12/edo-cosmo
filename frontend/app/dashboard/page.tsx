@@ -31,9 +31,11 @@ interface DashboardData {
 }
 
 function getFontSize(text: string) {
-  if (text.length <= 12) return "text-2xl sm:text-3xl";
+  if (text.length <= 10) return "text-3xl";
+  if (text.length <= 13) return "text-2xl";
   if (text.length <= 16) return "text-xl";
-  return "text-lg";
+  if (text.length <= 19) return "text-lg";
+  return "text-base";
 }
 
 function StatCard({ title, value, icon: Icon, color, subtitle, subtitleRed }: {
@@ -44,7 +46,7 @@ function StatCard({ title, value, icon: Icon, color, subtitle, subtitleRed }: {
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <p className="text-xs sm:text-sm text-gray-500 font-medium leading-tight">{title}</p>
-          <p className={`${getFontSize(value)} font-bold text-gray-800 mt-0.5 sm:mt-1 leading-tight break-words`}>{value}</p>
+          <p className={`${getFontSize(value)} font-bold text-gray-800 mt-0.5 sm:mt-1 whitespace-nowrap overflow-x-auto`}>{value}</p>
           {subtitle && <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">{subtitle}</p>}
           {subtitleRed && <p className="text-xs text-red-400 mt-0.5 hidden sm:block">{subtitleRed}</p>}
         </div>
@@ -169,7 +171,7 @@ export default function DashboardPage() {
                     {(() => {
                       const pnlText = `${(pnlData.isLoss ?? false) ? "−" : "+"}${fmt(Math.abs(pnlData.netProfit ?? 0))}`;
                       return (
-                        <p className={`${getFontSize(pnlText)} font-bold text-white leading-tight break-words`}>
+                    <p className={`${getFontSize(pnlText)} font-bold text-white whitespace-nowrap overflow-x-auto`}>
                           {pnlText}
                         </p>
                       );
