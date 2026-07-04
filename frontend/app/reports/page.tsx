@@ -2,10 +2,6 @@
 import { useEffect, useState, useCallback } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
-} from "recharts";
 import { DollarSign, Calendar, RotateCcw, X, AlertTriangle, CheckCircle, Download } from "lucide-react";
 import axios from "axios";
 import jsPDF from "jspdf";
@@ -402,53 +398,8 @@ function PurchasesSection({ onReportReady }: { onReportReady: (r: PurchaseReport
               ))}
             </div>
 
-            {/* Spending chart */}
-            <div className="mb-5">
-              <h3 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Spending Over Time</h3>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={report.spendingByDay} barCategoryGap="30%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                  <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v: number) => fmt(v)} />
-                  <Bar dataKey="amount" name="Spent" fill="#6366f1" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Top restocked products */}
-            <div className="mb-5">
-              <h3 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Most Restocked Products</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-400 text-xs border-b border-gray-100">
-                      <th className="pb-2 font-medium w-8">#</th>
-                      <th className="pb-2 font-medium">Product</th>
-                      <th className="pb-2 font-medium hidden sm:table-cell">Category</th>
-                      <th className="pb-2 font-medium text-right">Units</th>
-                      <th className="pb-2 font-medium text-right">Total Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.topRestockedProducts.length === 0 ? (
-                      <tr><td colSpan={5} className="py-4 text-center text-gray-400 text-xs">No data</td></tr>
-                    ) : report.topRestockedProducts.map((p, i) => (
-                      <tr key={p.productId} className="border-b border-gray-50">
-                        <td className="py-2 text-gray-400 font-bold text-xs">{i + 1}</td>
-                        <td className="py-2 font-medium text-gray-700 text-xs">{p.productName}</td>
-                        <td className="py-2 text-gray-400 text-xs hidden sm:table-cell">{p.category}</td>
-                        <td className="py-2 text-right text-gray-600 text-xs">{p.totalQty}</td>
-                        <td className="py-2 text-right font-semibold text-indigo-600 text-xs">{fmt(p.totalCost)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
             {/* Recent purchases */}
-            <div>
+            <div className="mt-5">
               <h3 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Recent Purchases</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
