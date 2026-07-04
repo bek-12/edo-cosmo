@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
+import AutoFitText from "@/components/AutoFitText";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -30,14 +31,6 @@ interface DashboardData {
   pnl: { weekly: PnLData; monthly: PnLData; yearly: PnLData };
 }
 
-function getFontSize(text: string) {
-  if (text.length <= 10) return "text-3xl";
-  if (text.length <= 13) return "text-2xl";
-  if (text.length <= 16) return "text-xl";
-  if (text.length <= 19) return "text-lg";
-  return "text-base";
-}
-
 function StatCard({ title, value, icon: Icon, color, subtitle, subtitleRed }: {
   title: string; value: string; icon: React.ElementType; color: string; subtitle?: string; subtitleRed?: string;
 }) {
@@ -46,7 +39,7 @@ function StatCard({ title, value, icon: Icon, color, subtitle, subtitleRed }: {
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <p className="text-xs sm:text-sm text-gray-500 font-medium leading-tight">{title}</p>
-          <p className={`${getFontSize(value)} font-bold text-gray-800 mt-0.5 sm:mt-1 whitespace-nowrap overflow-x-auto`}>{value}</p>
+          <AutoFitText text={value} maxFontSize={30} minFontSize={16} className="text-gray-800 mt-0.5 sm:mt-1" />
           {subtitle && <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">{subtitle}</p>}
           {subtitleRed && <p className="text-xs text-red-400 mt-0.5 hidden sm:block">{subtitleRed}</p>}
         </div>
@@ -168,14 +161,12 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="my-1 sm:my-2">
-                    {(() => {
-                      const pnlText = `${(pnlData.isLoss ?? false) ? "−" : "+"}${fmt(Math.abs(pnlData.netProfit ?? 0))}`;
-                      return (
-                    <p className={`${getFontSize(pnlText)} font-bold text-white whitespace-nowrap overflow-x-auto`}>
-                          {pnlText}
-                        </p>
-                      );
-                    })()}
+                    <AutoFitText
+                      text={`${(pnlData.isLoss ?? false) ? "−" : "+"}${fmt(Math.abs(pnlData.netProfit ?? 0))}`}
+                      maxFontSize={30}
+                      minFontSize={16}
+                      className="text-white"
+                    />
                   </div>
                   <p className={`text-xs font-semibold ${(pnlData.netProfit ?? 0) < 0 ? "text-red-200" : (pnlData.netProfit ?? 0) === 0 ? "text-orange-100" : "text-green-100"}`}>
                     {(pnlData.netProfit ?? 0) > 0 ? "▲ Net Profit" : (pnlData.netProfit ?? 0) < 0 ? "▼ Net Loss" : "◆ Break Even"}
