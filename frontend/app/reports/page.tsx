@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
-import { Calendar, RotateCcw, X, AlertTriangle, CheckCircle, Download } from "lucide-react";
+import { Search, Calendar, RotateCcw, X, AlertTriangle, CheckCircle, Download } from "lucide-react";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -274,6 +274,8 @@ export default function ReportsPage() {
   const [salesLoading, setSalesLoading] = useState(true);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate]     = useState("");
+  const [salesSearch, setSalesSearch]     = useState("");
+  const [purchasesSearch, setPurchasesSearch] = useState("");
   const [currentSummary, setCurrentSummary]               = useState<SummaryData | null>(null);
   const [currentPurchaseReport, setCurrentPurchaseReport] = useState<PurchaseReport | null>(null);
   const [returnSale, setReturnSale]   = useState<Sale | null>(null);
@@ -293,8 +295,8 @@ export default function ReportsPage() {
     return d.toISOString().split("T")[0];
   }, []);
 
-  // Clear manual dates when period changes
-  useEffect(() => { setFromDate(""); setToDate(""); }, [period]);
+  // Clear manual dates and search when period changes
+  useEffect(() => { setFromDate(""); setToDate(""); setSalesSearch(""); }, [period]);
 
   const fetchSales = useCallback(() => {
     setSalesLoading(true);
@@ -392,11 +394,11 @@ export default function ReportsPage() {
         {/* Tab + Period toggles */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
-            <button onClick={() => setActiveTab("sales")}
+            <button onClick={() => { setActiveTab("sales"); setSalesSearch(""); setPurchasesSearch(""); }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === "sales" ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
               Sales Report
             </button>
-            <button onClick={() => setActiveTab("purchases")}
+            <button onClick={() => { setActiveTab("purchases"); setSalesSearch(""); setPurchasesSearch(""); }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === "purchases" ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
               Purchases Report
             </button>
@@ -451,6 +453,18 @@ export default function ReportsPage() {
               </div>
             </div>
 
+            {/* Sales search */}
+            <div className="relative mb-4 w-full sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by product or cashier..."
+                value={salesSearch}
+                onChange={(e) => setSalesSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+              />
+            </div>
+
             {salesLoading ? (
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex items-center justify-center h-40">
                 <div className="flex flex-col items-center gap-2 text-gray-400">
@@ -476,65 +490,88 @@ export default function ReportsPage() {
                       <tbody>
                         {sales.length === 0 ? (
                           <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">No sales found</td></tr>
-                        ) : sales.map((s) => {
-                          const expired = hoursSince(s.createdAt) >= 24;
-                          return (
-                            <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
-                              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(s.createdAt)}</td>
-                              <td className="px-4 py-3 text-gray-700 font-medium">{s.cashier.name}</td>
-                              <td className="px-4 py-3 text-gray-500">{s.items.reduce((sum, i) => sum + i.quantity, 0)} units</td>
-                              <td className="px-4 py-3 text-gray-500 max-w-xs">
-                                <div className="flex flex-wrap gap-1">
-                                  {s.items.map((item) => (
-                                    <span key={item.id} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                                      {item.product.name} ×{item.quantity}
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 font-bold text-rose-600">{fmt(s.totalAmount)}</td>
-                              <td className="px-4 py-3">
-                                <button onClick={() => !expired && openReturn(s)} disabled={expired}
-                                  title={expired ? "Return window expired (24 hours)" : "Process return"}
-                                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${expired ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-rose-50 text-rose-600 hover:bg-rose-100"}`}>
-                                  <RotateCcw className="w-3.5 h-3.5" />Return
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        ) : (() => {
+                          const q = salesSearch.toLowerCase();
+                          const filtered = salesSearch
+                            ? sales.filter((s) =>
+                                s.cashier.name.toLowerCase().includes(q) ||
+                                s.items.some((it) => it.product.name.toLowerCase().includes(q))
+                              )
+                            : sales;
+                          return filtered.length === 0 ? (
+                            <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">No sales found matching &ldquo;{salesSearch}&rdquo;</td></tr>
+                          ) : filtered.map((s) => {
+                            const expired = hoursSince(s.createdAt) >= 24;
+                            return (
+                              <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
+                                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(s.createdAt)}</td>
+                                <td className="px-4 py-3 text-gray-700 font-medium">{s.cashier.name}</td>
+                                <td className="px-4 py-3 text-gray-500">{s.items.reduce((sum, i) => sum + i.quantity, 0)} units</td>
+                                <td className="px-4 py-3 text-gray-500 max-w-xs">
+                                  <div className="flex flex-wrap gap-1">
+                                    {s.items.map((item) => (
+                                      <span key={item.id} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                                        {item.product.name} ×{item.quantity}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 font-bold text-rose-600">{fmt(s.totalAmount)}</td>
+                                <td className="px-4 py-3">
+                                  <button onClick={() => !expired && openReturn(s)} disabled={expired}
+                                    title={expired ? "Return window expired (24 hours)" : "Process return"}
+                                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${expired ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-rose-50 text-rose-600 hover:bg-rose-100"}`}>
+                                    <RotateCcw className="w-3.5 h-3.5" />Return
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
                 </div>
                 <div className="sm:hidden space-y-3">
-                  {sales.length === 0 ? (
-                    <div className="text-center text-gray-400 py-12">No sales found</div>
-                  ) : sales.map((s) => {
-                    const expired = hoursSince(s.createdAt) >= 24;
-                    return (
-                      <div key={s.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <p className="text-xs text-gray-500">{fmtDateShort(s.createdAt)}</p>
-                            <p className="text-sm font-semibold text-gray-800 mt-0.5">{s.cashier.name}</p>
-                          </div>
-                          <span className="text-base font-bold text-rose-600">{fmt(s.totalAmount)}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {s.items.map((item) => (
-                            <span key={item.id} className="text-xs bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full font-medium">
-                              {item.product.name} ×{item.quantity}
-                            </span>
-                          ))}
-                        </div>
-                        <button onClick={() => !expired && openReturn(s)} disabled={expired}
-                          className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium ${expired ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-rose-50 text-rose-600 hover:bg-rose-100"}`}>
-                          <RotateCcw className="w-4 h-4" />{expired ? "Return Expired" : "Process Return"}
-                        </button>
+                  {(() => {
+                    const q = salesSearch.toLowerCase();
+                    const filtered = salesSearch
+                      ? sales.filter((s) =>
+                          s.cashier.name.toLowerCase().includes(q) ||
+                          s.items.some((it) => it.product.name.toLowerCase().includes(q))
+                        )
+                      : sales;
+                    if (filtered.length === 0) return (
+                      <div className="text-center text-gray-400 py-12">
+                        {salesSearch ? `No sales found matching "${salesSearch}"` : "No sales found"}
                       </div>
                     );
-                  })}
+                    return filtered.map((s) => {
+                      const expired = hoursSince(s.createdAt) >= 24;
+                      return (
+                        <div key={s.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <p className="text-xs text-gray-500">{fmtDateShort(s.createdAt)}</p>
+                              <p className="text-sm font-semibold text-gray-800 mt-0.5">{s.cashier.name}</p>
+                            </div>
+                            <span className="text-base font-bold text-rose-600">{fmt(s.totalAmount)}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            {s.items.map((item) => (
+                              <span key={item.id} className="text-xs bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full font-medium">
+                                {item.product.name} ×{item.quantity}
+                              </span>
+                            ))}
+                          </div>
+                          <button onClick={() => !expired && openReturn(s)} disabled={expired}
+                            className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium ${expired ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-rose-50 text-rose-600 hover:bg-rose-100"}`}>
+                            <RotateCcw className="w-4 h-4" />{expired ? "Return Expired" : "Process Return"}
+                          </button>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </>
             )}
@@ -544,6 +581,19 @@ export default function ReportsPage() {
         {/* Purchases tab table */}
         {activeTab === "purchases" && currentPurchaseReport && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Purchases search */}
+            <div className="p-4 border-b border-gray-100">
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by product name..."
+                  value={purchasesSearch}
+                  onChange={(e) => setPurchasesSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                />
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
@@ -557,20 +607,30 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentPurchaseReport.recentPurchases.length === 0 ? (
-                    <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">No purchases in this period</td></tr>
-                  ) : currentPurchaseReport.recentPurchases.map((p, i) => (
-                    <tr key={p.id} className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/50"}`}>
-                      <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
-                        {new Date(p.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-gray-700 text-xs">{p.productName}</td>
-                      <td className="px-4 py-3 text-right text-gray-600 text-xs">+{p.quantity}</td>
-                      <td className="px-4 py-3 text-right text-gray-500 text-xs hidden sm:table-cell">{fmt(p.buyingPrice)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-indigo-600 text-xs">{fmt(p.totalCost)}</td>
-                      <td className="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{p.restockedBy}</td>
-                    </tr>
-                  ))}
+                  {(() => {
+                    const q = purchasesSearch.toLowerCase();
+                    const filtered = purchasesSearch
+                      ? currentPurchaseReport.recentPurchases.filter((p) =>
+                          p.productName.toLowerCase().includes(q)
+                        )
+                      : currentPurchaseReport.recentPurchases;
+                    return filtered.length === 0 ? (
+                      <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+                        {purchasesSearch ? `No purchases found matching "${purchasesSearch}"` : "No purchases in this period"}
+                      </td></tr>
+                    ) : filtered.map((p, i) => (
+                      <tr key={p.id} className={`border-b border-gray-50 ${i % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                        <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
+                          {new Date(p.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-gray-700 text-xs">{p.productName}</td>
+                        <td className="px-4 py-3 text-right text-gray-600 text-xs">+{p.quantity}</td>
+                        <td className="px-4 py-3 text-right text-gray-500 text-xs hidden sm:table-cell">{fmt(p.buyingPrice)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-indigo-600 text-xs">{fmt(p.totalCost)}</td>
+                        <td className="px-4 py-3 text-gray-400 text-xs hidden md:table-cell">{p.restockedBy}</td>
+                      </tr>
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
