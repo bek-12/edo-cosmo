@@ -317,7 +317,7 @@ function SummarySection({ onSummaryReady }: { onSummaryReady: (s: SummaryData | 
         ) : summary ? (
           <>
             {/* KPI row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { label: "Total Sales", value: String(summary.totalSales), sub: "transactions" },
                 { label: "Revenue", value: fmt(summary.totalRevenue), sub: "after returns" },
@@ -335,51 +335,6 @@ function SummarySection({ onSummaryReady }: { onSummaryReady: (s: SummaryData | 
                   <p className="text-xs text-gray-400">{kpi.sub}</p>
                 </div>
               ))}
-            </div>
-
-            {/* Bar chart */}
-            <div className="mb-5">
-              <h3 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Revenue vs Spending</h3>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={summary.salesByDay} barCategoryGap="30%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v: number) => fmt(v)} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="revenue" name="Revenue" fill="#f43f5e" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="spent" name="Spent" fill="#d1d5db" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Top products table */}
-            <div>
-              <h3 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Top Products</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-400 text-xs border-b border-gray-100">
-                      <th className="pb-2 font-medium w-8">#</th>
-                      <th className="pb-2 font-medium">Product</th>
-                      <th className="pb-2 font-medium text-right">Units</th>
-                      <th className="pb-2 font-medium text-right">Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.topProducts.length === 0 ? (
-                      <tr><td colSpan={5} className="py-4 text-center text-gray-400 text-xs">No data</td></tr>
-                    ) : summary.topProducts.map((p, i) => (
-                      <tr key={i} className="border-b border-gray-50">
-                        <td className="py-2 text-gray-400 font-bold text-xs">{i + 1}</td>
-                        <td className="py-2 font-medium text-gray-700 text-xs">{p.productName}</td>
-                        <td className="py-2 text-right text-gray-600 text-xs">{p.unitsSold}</td>
-                        <td className="py-2 text-right font-semibold text-rose-600 text-xs">{fmt(p.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
           </>
         ) : null}
