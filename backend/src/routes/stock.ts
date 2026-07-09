@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticate, AuthRequest } from "../middleware/auth";
+import { getPeriodRange } from "../utils/periods";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -159,29 +160,17 @@ router.get("/report", authenticate, async (req: AuthRequest, res: Response): Pro
     const fromQ  = req.query.from as string | undefined;
     const toQ    = req.query.to   as string | undefined;
     const now    = new Date();
+
     let startDate: Date;
-    let endDate: Date = new Date(now.getTime() + 24 * 60 * 60 * 1000); // tomorrow
+    let endDate: Date;
 
     if (fromQ) {
-      startDate = new Date(fromQ);
-      startDate.setHours(0, 0, 0, 0);
-    } else if (period === "yearly") {
-      startDate = new Date(now);
-      startDate.setFullYear(now.getFullYear() - 1);
-      startDate.setHours(0, 0, 0, 0);
-    } else if (period === "monthly") {
-      startDate = new Date(now);
-      startDate.setDate(now.getDate() - 30);
-      startDate.setHours(0, 0, 0, 0);
+      startDate = new Date(fromQ); startDate.setHours(0, 0, 0, 0);
+      endDate   = toQ ? new Date(toQ + "T23:59:59.999") : new Date(now.getTime() + 24 * 60 * 60 * 1000);
     } else {
-      startDate = new Date(now);
-      startDate.setDate(now.getDate() - 7);
-      startDate.setHours(0, 0, 0, 0);
-    }
-
-    if (toQ) {
-      endDate = new Date(toQ);
-      endDate.setHours(23, 59, 59, 999);
+      const range = getPeriodRange(period);
+      startDate = range.start;
+      endDate   = range.end;
     }
 
     const where = { createdAt: { gte: startDate, lt: endDate } };

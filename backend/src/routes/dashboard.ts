@@ -1,6 +1,7 @@
 import { Router, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticate, AuthRequest } from "../middleware/auth";
+import { getPeriodRange } from "../utils/periods";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -12,30 +13,18 @@ interface PnLPeriod {
   isLoss: boolean;
 }
 
-async function calcPnL(start: Date): Promise<PnLPeriod> {
+async function calcPnL(start: Date, end: Date): Promise<PnLPeriod> {
+  const where = { createdAt: { gte: start, lt: end } };
   const [salesAgg, returnsAgg, spendAgg] = await Promise.all([
-    // Money received: sales - returns
-    prisma.sale.aggregate({
-      where: { createdAt: { gte: start } },
-      _sum: { totalAmount: true },
-    }),
-    prisma.return.aggregate({
-      where: { createdAt: { gte: start } },
-      _sum: { totalAmount: true },
-    }),
-    // Money spent via Restock button
-    prisma.stockPurchase.aggregate({
-      where: { createdAt: { gte: start } },
-      _sum: { totalCost: true },
-    }).catch(() => ({ _sum: { totalCost: 0 } })),
+    prisma.sale.aggregate({ where, _sum: { totalAmount: true } }),
+    prisma.return.aggregate({ where, _sum: { totalAmount: true } }),
+    prisma.stockPurchase.aggregate({ where, _sum: { totalCost: true } })
+      .catch(() => ({ _sum: { totalCost: 0 } })),
   ]);
 
-  const totalEarned =
-    (salesAgg._sum.totalAmount ?? 0) - (returnsAgg._sum.totalAmount ?? 0);
-
-  const totalSpent = spendAgg._sum.totalCost ?? 0;
-  const netProfit  = totalEarned - totalSpent;
-
+  const totalEarned = (salesAgg._sum.totalAmount ?? 0) - (returnsAgg._sum.totalAmount ?? 0);
+  const totalSpent  = spendAgg._sum.totalCost ?? 0;
+  const netProfit   = totalEarned - totalSpent;
   return { totalEarned, totalSpent, netProfit, isLoss: netProfit < 0 };
 }
 
@@ -43,13 +32,14 @@ async function calcPnL(start: Date): Promise<PnLPeriod> {
 router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
   console.log("Dashboard route hit");
   try {
-    const now = new Date();
+    const now          = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfToday   = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
     const in90Days     = new Date(startOfToday.getTime() + 90 * 24 * 60 * 60 * 1000);
-    const weekStart    = new Date(startOfToday.getTime() - 7   * 24 * 60 * 60 * 1000);
-    const monthStart   = new Date(startOfToday.getTime() - 30  * 24 * 60 * 60 * 1000);
-    const yearStart    = new Date(startOfToday.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+    const weekly  = getPeriodRange("weekly");
+    const monthly = getPeriodRange("monthly");
+    const yearly  = getPeriodRange("yearly");
 
     // Revenue all-time
     const [allSalesAgg, allReturnsAgg] = await Promise.all([
@@ -127,11 +117,11 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       });
     }
 
-    // P&L
-    const [weekly, monthly, yearly] = await Promise.all([
-      calcPnL(weekStart),
-      calcPnL(monthStart),
-      calcPnL(yearStart),
+    // P&L — calendar-based periods
+    const [pnlWeekly, pnlMonthly, pnlYearly] = await Promise.all([
+      calcPnL(weekly.start,  weekly.end),
+      calcPnL(monthly.start, monthly.end),
+      calcPnL(yearly.start,  yearly.end),
     ]);
 
     res.json({
@@ -146,7 +136,7 @@ router.get("/", authenticate, async (_req: AuthRequest, res: Response): Promise<
       expiringProducts,
       topProducts,
       revenueLastDays,
-      pnl: { weekly, monthly, yearly },
+      pnl: { weekly: pnlWeekly, monthly: pnlMonthly, yearly: pnlYearly },
     });
   } catch (error) {
     const err = error as Error;

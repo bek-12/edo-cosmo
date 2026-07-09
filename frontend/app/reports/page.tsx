@@ -297,11 +297,30 @@ export default function ReportsPage() {
   const [returnError, setReturnError]   = useState("");
 
   const getPeriodFrom = useCallback((p: "weekly" | "monthly" | "yearly"): string => {
-    const d = new Date();
-    if (p === "weekly")  d.setDate(d.getDate() - 7);
-    if (p === "monthly") d.setDate(d.getDate() - 30);
-    if (p === "yearly")  d.setFullYear(d.getFullYear() - 1);
-    return d.toISOString().split("T")[0];
+    const now = new Date();
+    if (p === "weekly") {
+      const dow = now.getDay();
+      const toMonday = dow === 0 ? 6 : dow - 1;
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - toMonday);
+      return monday.toISOString().split("T")[0];
+    }
+    if (p === "monthly") return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    return new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
+  }, []);
+
+  const getPeriodTo = useCallback((p: "weekly" | "monthly" | "yearly"): string => {
+    const now = new Date();
+    if (p === "weekly") {
+      const dow = now.getDay();
+      const toMonday = dow === 0 ? 6 : dow - 1;
+      const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - toMonday + 6);
+      return sunday.toISOString().split("T")[0];
+    }
+    if (p === "monthly") {
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return lastDay.toISOString().split("T")[0];
+    }
+    return new Date(now.getFullYear(), 11, 31).toISOString().split("T")[0];
   }, []);
 
   // Clear manual dates and search when period changes
@@ -313,12 +332,12 @@ export default function ReportsPage() {
   const fetchSales = useCallback(() => {
     setSalesLoading(true);
     const from = fromDate || getPeriodFrom(period);
-    const to   = toDate   || new Date().toISOString().split("T")[0];
+    const to   = toDate   || getPeriodTo(period);
     api.get(`/api/sales?from=${from}&to=${to}`)
       .then((res) => setSales(res.data))
       .catch(console.error)
       .finally(() => setSalesLoading(false));
-  }, [period, fromDate, toDate, getPeriodFrom]);
+  }, [period, fromDate, toDate, getPeriodFrom, getPeriodTo]);
 
   useEffect(() => { fetchSales(); }, [fetchSales]);
 
